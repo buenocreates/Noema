@@ -113,12 +113,17 @@ function cleanResponse(text) {
   text = text.replace(/[\u{2700}-\u{27BF}]/gu, ''); // Dingbats
   
   // Check if it's a guess in question form like "Is your character Donald Trump?"
-  const questionGuessPattern = /^Is your character (.*?)\?$/i;
+  // Only match if it looks like a proper name (has capitalized words, not just descriptive words)
+  const questionGuessPattern = /^Is your character ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\?$/;
   const questionGuessMatch = text.match(questionGuessPattern);
   if (questionGuessMatch) {
-    // Convert question-guess to statement-guess
+    // Convert question-guess to statement-guess only if it looks like a name
     const name = questionGuessMatch[1].trim();
-    text = `I think you are thinking of: ${name}`;
+    // Additional check: make sure it's not a common descriptive word
+    const descriptiveWords = ['real', 'fictional', 'male', 'female', 'famous', 'alive', 'dead', 'american', 'english', 'old', 'young'];
+    if (!descriptiveWords.includes(name.toLowerCase())) {
+      text = `I think you are thinking of: ${name}`;
+    }
   }
   
   // Check if it's a guess (statement format)
