@@ -1,0 +1,274 @@
+const express = require('express');
+const cors = require('cors');
+const Anthropic = require('@anthropic-ai/sdk');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.error('Error: ANTHROPIC_API_KEY environment variable is not set');
+  console.error('Please create a .env file with: ANTHROPIC_API_KEY=your_key_here');
+  process.exit(1);
+}
+
+// Store game sessions
+const gameSessions = new Map();
+
+// Extract name from guess text
+function extractGuessName(text) {
+  const patterns = [
+    /(?:I think you are thinking of|Are you thinking of|I believe you're thinking of|My guess is)[:\s]+(?:the\s+)?(.*?)(?:[?\.]|$)/i,
+    /(?:Thinking of|It is|That would be)[:\s]+(?:the\s+)?(.*?)(?:[?\.]|$)/i
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim().replace(/^the\s+/i, '');
+    }
+  }
+  
+  // Fallback: try to extract capitalized name
+  const words = text.split(/\s+/);
+  const nameWords = [];
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i].replace(/[?.,:;!]/g, '');
+    if (word[0] && word[0] === word[0].toUpperCase() && word.length > 1) {
+      nameWords.push(word);
+      if (nameWords.length >= 2) break; // Usually names are 2+ words
+    }
+  }
+  return nameWords.join(' ') || null;
+}
+
+// Get image URL from Wikipedia
+async function getImageForGuess(name) {
+  try {
+    const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`;
+    const response = await fetch(searchUrl);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.original && data.original.source) {
+        return data.original.source;
+      } else if (data.thumbnail && data.thumbnail.source) {
+        return data.thumbnail.source.replace('/thumb/', '/').split('/').slice(0, -1).join('/');
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching image:', error);
+  }
+  return null;
+}
+
+// API endpoint to get image for a guess
+app.get('/api/game/image/:name', async (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const imageUrl = await getImageForGuess(name);
+    if (imageUrl) {
+      res.json({ imageUrl });
+    } else {
+      res.json({ imageUrl: null });
+    }
+  } catch (error) {
+    console.error('Error getting image:', error);
+    res.json({ imageUrl: null });
+  }
+});
+
+// Initialize a new game session
+app.post('/api/game/start', async (req, res) => {
+  try {
+    const sessionId = Date.now().toString();
+    const systemPrompt = 'You are playing Akinator. Ask ONLY short yes/no questions. Maximum 8 words per question. NO emojis. NO punctuation except question mark. NO reactions. NO explanations. Just ask the question. Example: "Is this person real" or "Are they male" or "Do they act". After 8 questions, guess. Format guess as: "I think you are thinking of: [NAME]".';
+    
+    const conversationHistory = [{
+      role: 'user',
+      content: 'Start'
+    }];
+
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 50,
+      system: systemPrompt,
+      messages: conversationHistory
+    });
+
+    const firstQuestion = message.content[0].text;
+    conversationHistory.push({
+      role: 'assistant',
+      content: firstQuestion
+    });
+
+    gameSessions.set(sessionId, {
+      conversationHistory,
+      guessCount: 0
+    });
+
+    res.json({
+      sessionId,
+      question: firstQuestion
+    });
+  } catch (error) {
+    console.error('Error starting game:', error);
+    console.error('Error details:', error.message, error.stack);
+    res.status(500).json({ 
+      error: 'Failed to start game',
+      details: error.message 
+    });
+  }
+});
+
+// Submit an answer and get next question
+app.post('/api/game/answer', async (req, res) => {
+  try {
+    const { sessionId, answer } = req.body;
+
+    if (!gameSessions.has(sessionId)) {
+      return res.status(404).json({ error: 'Game session not found' });
+    }
+
+    const session = gameSessions.get(sessionId);
+    session.conversationHistory.push({
+      role: 'user',
+      content: answer
+    });
+
+    // Track answer patterns for confidence calculation
+    const recentAnswers = session.conversationHistory
+      .filter(m => m.role === 'user')
+      .slice(-5)
+      .map(m => m.content.toLowerCase());
+    
+    const yesCount = recentAnswers.filter(a => a.includes('yes') || a.includes('probably')).length;
+    const confidence = yesCount / Math.max(recentAnswers.length, 1);
+
+    // Determine if we should make a guess (after 8-12 questions for faster guessing)
+    const questionCount = session.conversationHistory.filter(m => m.role === 'assistant').length;
+    const shouldGuess = (questionCount >= 8 && confidence > 0.5) || 
+                       (questionCount >= 10 && questionCount % 2 === 0);
+
+    let systemPrompt = 'Ask ONLY short yes/no questions. Maximum 8 words. NO emojis. NO punctuation except question mark. NO reactions. NO explanations. Just the question. Example: "Is this person real" or "Are they male". After 8 questions total, guess. Format guess as: "I think you are thinking of: [NAME]".';
+    
+    if (shouldGuess) {
+      systemPrompt = 'Make your guess now. Format as: "I think you are thinking of: [NAME]". NO emojis. NO extra text. Just the guess.';
+    }
+
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5-20251101',
+      max_tokens: 50,
+      system: systemPrompt,
+      messages: session.conversationHistory
+    });
+
+    const response = message.content[0].text;
+    session.conversationHistory.push({
+      role: 'assistant',
+      content: response
+    });
+
+    // Check if this is a guess
+    const isGuess = response.toLowerCase().includes('i think you are thinking of') || 
+                   response.toLowerCase().includes('are you thinking of') ||
+                   response.toLowerCase().includes('you are thinking of');
+
+    // Calculate progress based on questions and confidence
+    // Progress increases faster with more "yes" answers
+    const baseProgress = Math.min(90, Math.round((questionCount / 20) * 100));
+    const confidenceBoost = confidence > 0.6 ? Math.min(15, confidence * 20) : 0;
+    const progress = Math.min(95, baseProgress + confidenceBoost); // Cap at 95% until guess
+
+    let guessName = null;
+
+    if (isGuess) {
+      guessName = extractGuessName(response);
+    }
+
+    res.json({
+      question: response,
+      isGuess,
+      questionCount: questionCount + 1,
+      progress: isGuess ? 100 : progress,
+      guessName: guessName || undefined
+    });
+  } catch (error) {
+    console.error('Error processing answer:', error);
+    console.error('Error details:', error.message, error.stack);
+    res.status(500).json({ 
+      error: 'Failed to process answer',
+      details: error.message 
+    });
+  }
+});
+
+// Handle guess result
+app.post('/api/game/guess-result', async (req, res) => {
+  try {
+    const { sessionId, correct, actualAnswer } = req.body;
+
+    if (!gameSessions.has(sessionId)) {
+      return res.status(404).json({ error: 'Game session not found' });
+    }
+
+    const session = gameSessions.get(sessionId);
+    
+    if (correct) {
+      session.conversationHistory.push({
+        role: 'user',
+        content: 'Yes, that\'s correct!'
+      });
+    } else {
+      session.conversationHistory.push({
+        role: 'user',
+        content: `No, that's not correct. ${actualAnswer ? `The correct answer is: ${actualAnswer}` : 'Please ask more questions.'}`
+      });
+
+      // Continue asking questions
+      const message = await anthropic.messages.create({
+        model: 'claude-opus-4-5-20251101',
+        max_tokens: 50,
+        system: 'Your guess was wrong. Ask ONLY short yes/no questions. Maximum 8 words. NO emojis. NO punctuation except question mark. NO reactions. Ask 3-5 more questions then guess again. Format guess as: "I think you are thinking of: [NAME]".',
+        messages: session.conversationHistory
+      });
+
+      const nextQuestion = message.content[0].text;
+      session.conversationHistory.push({
+        role: 'assistant',
+        content: nextQuestion
+      });
+
+      return res.json({
+        question: nextQuestion,
+        continue: true
+      });
+    }
+
+    // Clean up session
+    gameSessions.delete(sessionId);
+
+    res.json({
+      success: true,
+      message: correct ? 'Great! I guessed correctly!' : 'Thanks for playing!'
+    });
+  } catch (error) {
+    console.error('Error processing guess result:', error);
+    console.error('Error details:', error.message, error.stack);
+    res.status(500).json({ 
+      error: 'Failed to process guess result',
+      details: error.message 
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
