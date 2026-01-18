@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noema - Guess</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main>
+        <div id="guess-screen" class="screen active">
+            <div class="guess-container">
+                <h2>I think you are thinking of:</h2>
+                <div class="guess-image-container" id="guess-image-container" style="display: none;">
+                    <img id="guess-image" src="" alt="Guess" class="guess-image">
+                </div>
+                <div class="guess-text" id="guess-text"></div>
+                <div class="guess-description" id="guess-description"></div>
+                <div class="guess-buttons">
+                    <button class="btn btn-success" id="correct-btn">Yes, that's correct!</button>
+                    <button class="btn btn-danger" id="wrong-btn">No, that's wrong</button>
+                    <button class="btn btn-primary" id="continue-btn">Continue questioning</button>
+                </div>
+                <div id="wrong-input" style="display: none; margin-top: 20px;">
+                    <input type="text" id="actual-answer" placeholder="Who were you thinking of?" class="input-text">
+                    <button class="btn btn-primary" id="submit-answer-btn">Submit</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="guess.js"></script>
+</body>
+</html>

@@ -78,6 +78,12 @@ body {
     box-sizing: border-box;
 }
 
+/* Game screen uses wider layout */
+body.game-screen-active {
+    width: 100%;
+    max-width: 900px;
+}
+
 a {
     transition: all 200ms ease;
     color: #2b52ad;
@@ -222,11 +228,12 @@ body.guess-screen-active .landingimage {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 20px;
+    gap: 30px;
     max-width: 900px;
     width: 100%;
-    margin: 0 auto;
+    margin: 20px auto;
     padding: 20px;
+    min-height: 400px;
 }
 
 .model-container {

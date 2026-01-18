@@ -11,14 +11,14 @@ let currentRotationX = 0;
 const rotationSensitivity = 0.002;
 const rotationSmoothing = 0.1;
 
-async function init3DModel() {
+async function init3DModel(canvasId = 'noema3d-canvas') {
     try {
         const { Scene, PerspectiveCamera, WebGLRenderer, AmbientLight, DirectionalLight, PointLight, HemisphereLight, Box3, Vector3 } = await import('three');
         const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
         
-        const canvas = document.getElementById('noema3d-canvas');
+        const canvas = document.getElementById(canvasId);
         if (!canvas) {
-            console.error('Canvas not found');
+            // Canvas doesn't exist on this page, skip
             return;
         }
 
@@ -227,11 +227,19 @@ function animate3D() {
     }
 }
 
-// Initialize 3D model when page loads
+// Initialize 3D model when page loads - for landing page canvas
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init3DModel);
+    document.addEventListener('DOMContentLoaded', () => {
+        init3DModel('noema3d-canvas');
+        init3DModel('noema3d-canvas-game');
+    });
 } else {
-    init3DModel();
+    init3DModel('noema3d-canvas');
+    // Initialize game canvas only if it exists (on game screen)
+    const gameCanvas = document.getElementById('noema3d-canvas-game');
+    if (gameCanvas) {
+        init3DModel('noema3d-canvas-game');
+    }
 }
 
 const API_BASE = 'http://localhost:3000/api';
@@ -336,6 +344,12 @@ async function loadGuessImage(guessName, existingImageUrl = null) {
 async function startGame() {
     try {
         showScreen(gameScreen);
+        // Initialize 3D model for game screen if not already done
+        const gameCanvas = document.getElementById('noema3d-canvas-game');
+        if (gameCanvas && !gameCanvas.hasAttribute('data-initialized')) {
+            await init3DModel('noema3d-canvas-game');
+            gameCanvas.setAttribute('data-initialized', 'true');
+        }
         loading.style.display = 'block';
         answerButtons.forEach(btn => btn.disabled = true);
 
@@ -425,7 +439,17 @@ async function submitAnswer(answer) {
             // Try to load image
             loadGuessImage(guessName, data.guessImage);
             
-            showScreen(guessScreen);
+            // Store guess data in sessionStorage for guess.html
+            sessionStorage.setItem('guessData', JSON.stringify({
+                guessName: guessName,
+                guessImage: data.guessImage,
+                guessDescription: data.guessDescription,
+                sessionId: sessionId,
+                questionCount: currentQuestionCount
+            }));
+            
+            // Redirect to guess page
+            window.location.href = 'guess.html';
         } else {
             lastQuestion = data.question;
             questionText.textContent = data.question;
