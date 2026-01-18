@@ -438,9 +438,6 @@ async function submitAnswer(answer) {
                 guessDescription.style.display = 'none';
             }
             
-            // Try to load image
-            loadGuessImage(guessName, data.guessImage);
-            
             // Store guess data in sessionStorage for guess.html
             sessionStorage.setItem('guessData', JSON.stringify({
                 guessName: guessName,
@@ -450,10 +447,9 @@ async function submitAnswer(answer) {
                 questionCount: currentQuestionCount
             }));
             
-            // Redirect to guess page
-            setTimeout(() => {
-                window.location.href = 'guess.html';
-            }, 100);
+            // Redirect to guess page immediately
+            window.location.href = 'guess.html';
+            return; // Exit early to prevent any other code from running
         } else {
             lastQuestion = data.question;
             questionText.textContent = data.question;
