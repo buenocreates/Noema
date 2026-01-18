@@ -1,0 +1,18 @@
+{
+  "wrongGuesses": [
+    {
+      "correctAnswer": "k",
+      "wrongGuess": "Mia Malkova",
+      "timestamp": "2026-01-18T10:36:53.684Z",
+      "conversationLength": 40
+    },
+    {
+      "correctAnswer": "k",
+      "wrongGuess": "Mia Malkova",
+      "timestamp": "2026-01-18T10:36:55.262Z",
+      "conversationLength": 41
+    }
+  ],
+  "correctAnswers": [],
+  "questionPatterns": []
+}
