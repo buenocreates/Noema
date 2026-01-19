@@ -344,7 +344,7 @@ async function loadGuessImage(guessName, existingImageUrl = null) {
 // Start a new game
 async function startGame() {
     // Redirect IMMEDIATELY - don't wait for API call
-    const targetUrl = window.location.origin + '/guess.html';
+    const targetUrl = window.location.origin + '/guess';
     console.log('Redirecting to game page immediately:', targetUrl);
     
     // Start API call in background but don't wait for it
@@ -441,7 +441,7 @@ async function submitAnswer(answer) {
             }));
             
             // Redirect to guess page immediately - use absolute path
-            const targetUrl = window.location.origin + '/guess.html';
+            const targetUrl = window.location.origin + '/guess';
             console.log('ABOUT TO REDIRECT from', window.location.href, 'to:', targetUrl);
             // Force immediate redirect - prevent any other code from running
             loading.style.display = 'none';

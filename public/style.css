@@ -628,7 +628,9 @@ body.guess-screen-active .speech-bubble::after {
 }
 
 .btn-answer:hover {
-    filter: brightness(110%);
+    filter: brightness(120%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .btn-answer:active {
@@ -669,8 +671,17 @@ body.guess-screen-active .speech-bubble::after {
     font-family: 'VT323', monospace;
 }
 
+/* Start Game button - bigger */
+#start-btn {
+    font-size: 24px;
+    padding: 16px 32px;
+    border: 3px solid #ff6b35;
+}
+
 .btn:hover {
-    filter: brightness(110%);
+    filter: brightness(120%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .btn:active {
@@ -876,15 +887,95 @@ body.guess-screen-active #guess-screen .guess-buttons {
     }
 }
 
-/* Logs link */
+/* Logs link - styled as button (inverted colors) */
 .logs-link {
-    color: #fff5f0;
+    display: inline-block;
+    color: #ff6b35;
     text-decoration: none;
     font-family: 'VT323', monospace;
-    font-size: 18px;
-    transition: text-decoration 200ms ease;
+    font-size: 24px;
+    font-weight: 600;
+    padding: 16px 32px;
+    border: 3px solid #ff6b35;
+    border-radius: 4px;
+    background-color: transparent;
+    transition: all 200ms ease;
+    cursor: pointer;
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+    margin-bottom: 20px;
 }
 
 .logs-link:hover {
-    text-decoration: underline;
+    background-color: rgba(255, 107, 53, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(255, 107, 53, 0.5);
+    text-decoration: none;
+}
+
+/* Copy text (CA: ...) */
+.copy-text {
+    cursor: pointer;
+    transition: all 200ms ease;
+    user-select: none;
+}
+
+.copy-text:hover {
+    color: #ffaa66 !important;
+    transform: scale(1.1);
+    text-shadow: 0 0 10px rgba(255, 170, 102, 0.5);
+}
+
+/* Back button */
+.back-button {
+    cursor: pointer;
+    transition: all 200ms ease;
+}
+
+.back-button:hover {
+    background-color: #ffaa66 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 12px rgba(255, 107, 53, 0.5) !important;
+}
+
+/* Back question button */
+.btn-back-question,
+.back-button-question {
+    cursor: pointer;
+    transition: all 200ms ease;
+}
+
+.btn-back-question:hover,
+.back-button-question:hover {
+    background-color: rgba(255, 107, 53, 0.8) !important;
+    transform: scale(1.15) !important;
+}
+
+/* Social links footer */
+footer {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    z-index: 1000;
+}
+
+.social-link {
+    color: #ff6b35;
+    transition: all 200ms ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.social-link:hover {
+    color: #ffaa66;
+    transform: translateY(-3px) scale(1.1);
+}
+
+.social-link svg {
+    width: 24px;
+    height: 24px;
 }

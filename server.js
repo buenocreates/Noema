@@ -13,6 +13,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Route handlers for clean URLs
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/logs', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'monitor.html'));
+});
+
+app.get('/guess', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'guess.html'));
+});
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });

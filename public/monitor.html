@@ -276,19 +276,37 @@
         
         .back-link {
             display: inline-block;
-            margin-bottom: 20px;
-            padding: 10px 20px;
-            background-color: #ff6b35;
-            color: white;
-            text-decoration: none;
+            padding: 12px 20px;
+            border: 3px solid #ff6b35;
             border-radius: 4px;
-            font-family: 'VT323', monospace;
             font-size: 18px;
-            transition: background-color 200ms ease;
+            font-weight: 700;
+            cursor: pointer;
+            color: white;
+            text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+            background-color: #ff6b35;
+            font-family: 'VT323', monospace;
+            z-index: 99999;
+            text-decoration: none;
+            transition: all 200ms ease;
         }
         
         .back-link:hover {
             background-color: #ffaa66;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(255, 107, 53, 0.5);
+        }
+        
+        .copy-text {
+            cursor: pointer;
+            transition: all 200ms ease;
+            user-select: none;
+        }
+        
+        .copy-text:hover {
+            color: #ffaa66 !important;
+            transform: scale(1.1);
+            text-shadow: 0 0 10px rgba(255, 170, 102, 0.5);
         }
         
         .modal {
@@ -391,7 +409,11 @@
 </head>
 <body>
     <div class="container">
-        <a href="/index.html" class="back-link">← Back to Home</a>
+        <!-- Back Button (top left) -->
+        <a href="/" class="back-link" style="position: fixed; top: 20px; left: 20px; padding: 12px 20px; border: 3px solid #ff6b35; border-radius: 4px; font-size: 18px; font-weight: 700; cursor: pointer; color: white; text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5); background-color: #ff6b35; font-family: 'VT323', monospace; z-index: 99999; text-decoration: none; transition: all 200ms ease;">← Back to Home</a>
+        
+        <!-- Copyable text (top right) -->
+        <span id="copy-text" class="copy-text" style="position: fixed; top: 20px; right: 20px; font-family: 'VT323', monospace; font-size: 24px; color: #ff6b35; cursor: pointer; z-index: 99999; user-select: none; text-decoration: underline;">CA: ...</span>
         
         <div class="header">
             <h1>Noema Logs</h1>
@@ -460,7 +482,7 @@
     </div>
     
     <script>
-        const API_BASE = 'http://localhost:3000';
+        const API_BASE = '/api';
         let allConversations = [];
         let filteredConversations = [];
         
@@ -705,6 +727,30 @@
         
         // Initial fetch
         fetchConversations();
+        
+        // Copy text functionality (CA: ...)
+        const copyText = document.getElementById('copy-text');
+        if (copyText) {
+            // Always show "CA: ..."
+            copyText.textContent = 'CA: ...';
+            
+            // Copy to clipboard on click
+            copyText.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText('...');
+                    const originalText = copyText.textContent;
+                    copyText.textContent = 'Copied!';
+                    copyText.style.color = 'white';
+                    
+                    setTimeout(() => {
+                        copyText.textContent = originalText;
+                        copyText.style.color = '#ff6b35';
+                    }, 2000);
+                } catch (error) {
+                    console.error('Failed to copy:', error);
+                }
+            });
+        }
     </script>
 </body>
 </html>

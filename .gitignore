@@ -4,6 +4,3 @@ node_modules/
 .env.*.local
 .DS_Store
 *.log
-test-mongodb.js
-CONNECTION_STRING.md
-TROUBLESHOOT_MONGODB.md

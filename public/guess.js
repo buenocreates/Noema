@@ -747,12 +747,12 @@ if (gameSession.sessionId && gameSession.question) {
     // 3D model already initialized at page load
 } else {
     // No session data - redirect back to index
-    window.location.href = window.location.origin + '/index.html';
+    window.location.href = window.location.origin + '/';
 }
 
 // Handle continue questioning
 async function handleContinue() {
-    const targetUrl = window.location.origin + '/index.html';
+    const targetUrl = window.location.origin + '/';
     console.log('Redirecting from', window.location.href, 'to:', targetUrl);
     window.location.href = targetUrl;
 }
@@ -760,7 +760,7 @@ async function handleContinue() {
 // Handle guess result
 async function handleGuessResult(correct) {
     if (!sessionId) {
-        const targetUrl = window.location.origin + '/index.html';
+        const targetUrl = window.location.origin + '/';
         window.location.href = targetUrl;
         return;
     }
@@ -778,7 +778,7 @@ async function handleGuessResult(correct) {
         });
 
         if (response.ok) {
-            const targetUrl = window.location.origin + '/index.html';
+            const targetUrl = window.location.origin + '/';
             console.log('Redirecting from', window.location.href, 'to:', targetUrl);
             window.location.href = targetUrl;
         }
@@ -812,7 +812,7 @@ async function submitActualAnswer() {
     });
 
     if (response.ok) {
-        const targetUrl = window.location.origin + '/index.html';
+        const targetUrl = window.location.origin + '/';
         console.log('Redirecting from', window.location.href, 'to:', targetUrl);
         window.location.href = targetUrl;
     }
@@ -845,7 +845,7 @@ if (backBtn) {
         // Clear session data and go to home page
         sessionStorage.removeItem('gameSession');
         sessionStorage.removeItem('guessData');
-        window.location.href = window.location.origin + '/index.html';
+        window.location.href = window.location.origin + '/';
     });
 } else {
     console.error('Back button not found!');
