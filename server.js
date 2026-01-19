@@ -268,7 +268,8 @@ app.post('/api/game/start', async (req, res) => {
 
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-5-20251101',
-      max_tokens: 100,
+      max_tokens: 50,
+      temperature: 0.7,
       system: systemPrompt,
       messages: conversationHistory
     });
@@ -345,17 +346,20 @@ app.post('/api/game/answer', async (req, res) => {
       varietyInstruction = 'IMPORTANT: Switch to a different type of question. Vary your questions - don\'t repeat the same topic.';
     }
     
-    let systemPrompt = 'Your response must be ONLY a yes/no question. NO greetings. NO reactions. NO emojis. NO markdown formatting. NO bold text. NO asterisks. NO parenthetical explanations. NO exclamations. ' + varietyInstruction + ' Ask diverse strategic questions - actively switch between different categories: gender, real/fictional status, occupation, hobbies, relationships, appearance, time period, nationality, media presence, etc. NEVER ask multiple questions in a row about the same topic (e.g., don\'t ask 3 acting/job questions in a row). Questions should be varied and unique. Questions can vary in length naturally (like "Is your character a female?" or "Does your character personally know you?" or "Is your character linked with sports?"). The person could be ANYONE - real or fictional, famous or obscure, historical or modern, celebrities, characters, adult film actors/actresses, adult content creators, or even the player themselves. When you have enough information (typically after 8-15 strategic questions), make a guess formatted as: "I think you are thinking of: [NAME]"';
+    let systemPrompt = 'ONLY a yes/no question. NO greetings, reactions, emojis, markdown, bold, asterisks, explanations. ' + varietyInstruction + ' Ask diverse questions - gender, real/fictional, occupation, hobbies, relationships, appearance, time period, nationality. Person could be ANYONE. After 8-15 questions, guess: "I think you are thinking of: [NAME]"';
     
     if (shouldEncourageGuess) {
-      systemPrompt = 'You have asked enough questions. Make your guess now based on the information gathered. Be confident - if clues match a well-known person (like Donald Trump, Barack Obama, Albert Einstein, Taylor Swift, etc.), guess them. Format as: "I think you are thinking of: [NAME]". If you are truly unsure, ask ONE more strategic question. NO emojis. NO markdown formatting. NO bold text. NO asterisks. NO greetings. NO reactions. The person could be ANYONE - real or fictional, famous or obscure, historical or modern, celebrities, characters, adult film actors/actresses, adult content creators, or even the player themselves.';
+      systemPrompt = 'Guess now. Format: "I think you are thinking of: [NAME]". NO emojis, markdown, bold, asterisks, greetings, reactions.';
     }
 
+    // Use fewer tokens and limit conversation history for faster responses
+    const recentHistory = session.conversationHistory.slice(-10); // Only keep last 10 messages
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-5-20251101',
-      max_tokens: 100,
+      max_tokens: 40,
+      temperature: 0.7,
       system: systemPrompt,
-      messages: session.conversationHistory
+      messages: recentHistory
     });
 
     const response = cleanResponse(message.content[0].text);
@@ -378,22 +382,32 @@ app.post('/api/game/answer', async (req, res) => {
     let guessName = null;
     let guessInfo = null;
 
+    let guessName = null;
+    
     if (isGuess) {
       guessName = extractGuessName(response);
-      // Fetch info (image and description) for the guess
+      // Fetch Wikipedia info asynchronously - don't wait for it
       if (guessName) {
-        guessInfo = await getInfoForGuess(guessName);
+        getInfoForGuess(guessName).then(info => {
+          // Store in session for potential later use
+          if (session) {
+            session.lastGuessInfo = info;
+          }
+        }).catch(() => {
+          // Ignore errors
+        });
       }
     }
 
+    // Return immediately without waiting for Wikipedia
     res.json({
       question: response,
       isGuess,
       questionCount: questionCount + 1,
       progress: isGuess ? 100 : progress,
       guessName: guessName || undefined,
-      guessImage: guessInfo?.imageUrl || undefined,
-      guessDescription: guessInfo?.description || undefined
+      guessImage: undefined, // Will be fetched async via separate endpoint if needed
+      guessDescription: undefined
     });
   } catch (error) {
     console.error('Error processing answer:', error);
@@ -449,12 +463,14 @@ app.post('/api/game/guess-result', async (req, res) => {
         content: `No, that's not correct. ${actualAnswer ? `The correct answer is: ${actualAnswer}` : 'Please ask more questions.'}`
       });
 
-      // Continue asking questions
+      // Continue asking questions - use limited history and fewer tokens
+      const recentHistory = session.conversationHistory.slice(-10);
       const message = await anthropic.messages.create({
         model: 'claude-opus-4-5-20251101',
-        max_tokens: 100,
-        system: 'Your guess was wrong. Your response must be ONLY a yes/no question. NO greetings. NO reactions. NO emojis. NO markdown formatting. NO bold text. NO asterisks. NO parenthetical explanations. Ask diverse strategic questions - mix gender, real/fictional, occupation, hobbies, relationships, appearance, time period, nationality, media presence, etc. Don\'t focus only on occupation. Questions should be varied and unique. The person could be ANYONE - real or fictional, famous or obscure, historical or modern, celebrities, characters, adult film actors/actresses, adult content creators, or even the player themselves. Ask 3-5 more strategic questions then guess again. Format guess as: "I think you are thinking of: [NAME]"',
-        messages: session.conversationHistory
+        max_tokens: 40,
+        temperature: 0.7,
+        system: 'ONLY a yes/no question. NO greetings, reactions, emojis, markdown, bold, asterisks. Ask diverse questions - gender, real/fictional, occupation, hobbies, relationships, appearance, time period, nationality. Person could be ANYONE. After 3-5 questions, guess: "I think you are thinking of: [NAME]"',
+        messages: recentHistory
       });
 
       const nextQuestion = cleanResponse(message.content[0].text);

@@ -11,12 +11,34 @@
       "wrongGuess": "Mia Malkova",
       "timestamp": "2026-01-18T10:36:55.262Z",
       "conversationLength": 41
+    },
+    {
+      "correctAnswer": "John Pork",
+      "wrongGuess": "Cheems",
+      "timestamp": "2026-01-19T07:08:58.910Z",
+      "conversationLength": 38
+    },
+    {
+      "correctAnswer": "Neymar Jr.",
+      "wrongGuess": "Cristiano Ronaldo",
+      "timestamp": "2026-01-19T07:15:03.247Z",
+      "conversationLength": 22
+    },
+    {
+      "correctAnswer": "Neymar Jr.",
+      "wrongGuess": "Erling Haaland",
+      "timestamp": "2026-01-19T07:17:00.181Z",
+      "conversationLength": 36
     }
   ],
   "correctAnswers": [
     {
       "answer": "Lana Rhoades",
       "timestamp": "2026-01-18T11:21:10.900Z"
+    },
+    {
+      "answer": "Cristiano Ronaldo",
+      "timestamp": "2026-01-19T07:06:30.937Z"
     }
   ],
   "questionPatterns": []

@@ -1,10 +1,45 @@
 const API_BASE = '/api';
 
-// Load game session or guess data from sessionStorage
-const gameSession = JSON.parse(sessionStorage.getItem('gameSession') || '{}');
-const guessData = JSON.parse(sessionStorage.getItem('guessData') || '{}');
-let sessionId = gameSession.sessionId || guessData.sessionId || null;
-let currentQuestionCount = gameSession.questionCount || 0;
+// Clear session storage on page load to reset the game
+sessionStorage.removeItem('gameSession');
+sessionStorage.removeItem('guessData');
+
+// Ensure back button is visible immediately
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('back-btn');
+    console.log('Back button element:', btn);
+    if (btn) {
+        // Force all styles with cssText
+        btn.style.cssText = 'position: fixed !important; top: 20px !important; left: 20px !important; padding: 12px 20px !important; border: 3px solid #ff6b35 !important; border-radius: 4px !important; font-size: 18px !important; font-weight: 700 !important; cursor: pointer !important; color: white !important; text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5) !important; background-color: #ff6b35 !important; font-family: "VT323", monospace !important; z-index: 999999 !important; display: block !important; visibility: visible !important; opacity: 1 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;';
+        console.log('Back button styles applied');
+        console.log('Button position:', btn.getBoundingClientRect());
+        console.log('Computed display:', window.getComputedStyle(btn).display);
+        console.log('Computed visibility:', window.getComputedStyle(btn).visibility);
+        console.log('Computed opacity:', window.getComputedStyle(btn).opacity);
+        console.log('Computed z-index:', window.getComputedStyle(btn).zIndex);
+    } else {
+        console.error('Back button NOT FOUND in DOM!');
+    }
+});
+
+// Also try immediately (for module scripts)
+setTimeout(() => {
+    const btn = document.getElementById('back-btn');
+    if (btn) {
+        console.log('Button found, applying styles...');
+        console.log('Button computed styles:', window.getComputedStyle(btn));
+        btn.style.cssText = 'position: fixed !important; top: 20px !important; left: 20px !important; padding: 12px 20px !important; border: 3px solid #ff6b35 !important; border-radius: 4px !important; font-size: 18px !important; font-weight: 700 !important; cursor: pointer !important; color: white !important; text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5) !important; background-color: #ff6b35 !important; font-family: "VT323", monospace !important; z-index: 999999 !important; display: block !important; visibility: visible !important; opacity: 1 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;';
+        console.log('Button after styles:', btn);
+        console.log('Button offset:', btn.offsetTop, btn.offsetLeft);
+        console.log('Button getBoundingClientRect:', btn.getBoundingClientRect());
+    }
+}, 100);
+
+// Load game session or guess data from sessionStorage (will be empty after reset)
+const gameSession = {};
+const guessData = {};
+let sessionId = null;
+let currentQuestionCount = 0;
 
 // DOM elements
 const gameScreen = document.getElementById('game-screen');
@@ -12,7 +47,6 @@ const guessScreen = document.getElementById('guess-screen');
 const questionText = document.getElementById('question-text');
 const questionNumber = document.getElementById('question-number');
 const answerButtons = document.querySelectorAll('.btn-answer');
-const loading = document.getElementById('loading');
 const guessQuestionNumber = document.getElementById('guess-question-number');
 const guessText = document.getElementById('guess-text');
 const guessDescription = document.getElementById('guess-description');
@@ -24,16 +58,12 @@ const continueBtn = document.getElementById('continue-btn');
 const wrongInput = document.getElementById('wrong-input');
 const actualAnswerInput = document.getElementById('actual-answer');
 const submitAnswerBtn = document.getElementById('submit-answer-btn');
+const backBtn = document.getElementById('back-btn');
 
-// Initialize 3D model for guess page
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        // We'll need to copy the 3D model code here since we can't import it easily
-        initGuessPage3DModel();
-    });
-} else {
-    initGuessPage3DModel();
-}
+// Initialize 3D models immediately - don't wait for DOMContentLoaded
+// Start loading both models right away
+initGuessPage3DModel();
+initGamePage3DModel();
 
 // 3D Model variables for guess page
 let scene3DGuess, camera3DGuess, renderer3DGuess, model3DGuess;
@@ -61,7 +91,11 @@ async function initGuessPage3DModel() {
         const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
         
         const canvas = document.getElementById('noema3d-canvas-guess');
-        if (!canvas) return;
+        if (!canvas) {
+            // Canvas not ready yet, try again after a short delay
+            setTimeout(() => initGuessPage3DModel(), 100);
+            return;
+        }
 
         // Scene setup
         scene3DGuess = new Scene();
@@ -206,9 +240,7 @@ async function initGuessPage3DModel() {
                 animateGuess3D();
             },
             (progress) => {
-                if (progress.lengthComputable) {
-                    console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
-                }
+                // Loading progress - removed console log
             },
             (error) => console.error('Error loading 3D model:', error)
         );
@@ -263,6 +295,8 @@ function showScreen(screen) {
         document.body.classList.add('game-screen-active');
         document.body.classList.remove('guess-screen-active');
     }
+    // Back button is always visible on guess.html page
+    if (backBtn) backBtn.style.display = 'block';
 }
 
 // Initialize 3D model for game screen (same as home page with cursor tracking and glow)
@@ -417,9 +451,7 @@ async function initGamePage3DModel() {
                 animateGame3D();
             },
             (progress) => {
-                if (progress.lengthComputable) {
-                    console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
-                }
+                // Loading progress - removed console log
             },
             (error) => console.error('Error loading 3D model:', error)
         );
@@ -433,7 +465,6 @@ async function submitAnswer(answer) {
     if (!sessionId) return;
 
     try {
-        loading.style.display = 'block';
         answerButtons.forEach(btn => btn.disabled = true);
 
         const response = await fetch(`${API_BASE}/game/answer`, {
@@ -448,6 +479,41 @@ async function submitAnswer(answer) {
         });
 
         if (!response.ok) {
+            // If session not found, start a new game
+            if (response.status === 404) {
+                const errorData = await response.json().catch(() => ({}));
+                if (errorData.error === 'Game session not found') {
+                    // Start a new game
+                    const startResponse = await fetch(`${API_BASE}/game/start`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (!startResponse.ok) {
+                        throw new Error('Failed to start new game');
+                    }
+                    
+                    const startData = await startResponse.json();
+                    sessionId = startData.sessionId;
+                    currentQuestionCount = 1;
+                    sessionStorage.setItem('gameSession', JSON.stringify({
+                        sessionId: startData.sessionId,
+                        question: startData.question,
+                        questionCount: 1
+                    }));
+                    
+                    // Show the new question - fade-in only on initial page load
+                    questionText.textContent = startData.question;
+                    if (questionNumber) {
+                        questionNumber.textContent = `${currentQuestionCount}.`;
+                    }
+                    
+                    answerButtons.forEach(btn => btn.disabled = false);
+                    return;
+                }
+            }
             throw new Error('Failed to submit answer');
         }
 
@@ -486,22 +552,19 @@ async function submitAnswer(answer) {
                 guessImageContainer.style.display = 'block';
             }
             
-            // Initialize guess screen 3D model
-            initGuessPage3DModel();
+            // 3D model already initialized at page load
         } else {
-            // Continue with questions
+            // Continue with questions - no fade-in animation on updates
             questionText.textContent = data.question;
             if (questionNumber) {
                 questionNumber.textContent = `${currentQuestionCount}.`;
             }
         }
 
-        loading.style.display = 'none';
         answerButtons.forEach(btn => btn.disabled = false);
     } catch (error) {
         console.error('Error submitting answer:', error);
         alert('Failed to submit answer. Please try again.');
-        loading.style.display = 'none';
         answerButtons.forEach(btn => btn.disabled = false);
     }
 }
@@ -510,15 +573,26 @@ async function submitAnswer(answer) {
 if (gameSession.sessionId && gameSession.question) {
     // We were redirected from start game - show game screen
     showScreen(gameScreen);
+    // Reset and retrigger fade-in animation
+    questionText.style.animation = 'none';
+    if (questionNumber) {
+        questionNumber.style.animation = 'none';
+    }
+    void questionText.offsetWidth;
+    if (questionNumber) {
+        void questionNumber.offsetWidth;
+    }
+    questionText.style.animation = 'fadein 400ms ease-in 2000ms both';
+    if (questionNumber) {
+        questionNumber.style.animation = 'fadein 400ms ease-in 2000ms both';
+    }
     questionText.textContent = gameSession.question;
     currentQuestionCount = gameSession.questionCount || 1;
     if (questionNumber) {
         questionNumber.textContent = `${currentQuestionCount}.`;
     }
     
-    // Initialize 3D model for game screen
-    initGamePage3DModel();
-    
+    // 3D model already initialized at page load
     // Set up answer button listeners
     answerButtons.forEach(btn => {
         btn.addEventListener('click', () => submitAnswer(btn.dataset.answer));
@@ -526,7 +600,6 @@ if (gameSession.sessionId && gameSession.question) {
 } else if (!gameSession.sessionId && !guessData.guessName) {
     // No session data yet - start game API call
     showScreen(gameScreen);
-    loading.style.display = 'block';
     
     fetch(`${API_BASE}/game/start`, {
         method: 'POST',
@@ -552,8 +625,7 @@ if (gameSession.sessionId && gameSession.question) {
             questionNumber.textContent = `${currentQuestionCount}.`;
         }
         
-        loading.style.display = 'none';
-        initGamePage3DModel();
+        // 3D model already initialized at page load
         
         answerButtons.forEach(btn => {
             btn.addEventListener('click', () => submitAnswer(btn.dataset.answer));
@@ -561,7 +633,6 @@ if (gameSession.sessionId && gameSession.question) {
     }).catch(error => {
         console.error('Error starting game:', error);
         alert('Failed to start game. Please make sure the server is running.');
-        loading.style.display = 'none';
     });
 } else if (guessData.guessName) {
     // We have guess data - show guess screen
@@ -583,8 +654,7 @@ if (gameSession.sessionId && gameSession.question) {
         guessImageContainer.style.display = 'block';
     }
     
-    // Initialize guess screen 3D model
-    initGuessPage3DModel();
+    // 3D model already initialized at page load
 } else {
     // No session data - redirect back to index
     window.location.href = window.location.origin + '/index.html';
@@ -669,3 +739,24 @@ actualAnswerInput.addEventListener('keypress', (e) => {
         submitActualAnswer();
     }
 });
+
+// Handle back button - go to home page
+if (backBtn) {
+    // Force button to be visible
+    backBtn.style.display = 'block';
+    backBtn.style.visibility = 'visible';
+    backBtn.style.opacity = '1';
+    backBtn.style.position = 'fixed';
+    backBtn.style.top = '20px';
+    backBtn.style.left = '20px';
+    backBtn.style.zIndex = '99999';
+    
+    backBtn.addEventListener('click', () => {
+        // Clear session data and go to home page
+        sessionStorage.removeItem('gameSession');
+        sessionStorage.removeItem('guessData');
+        window.location.href = window.location.origin + '/index.html';
+    });
+} else {
+    console.error('Back button not found!');
+}
