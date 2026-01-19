@@ -7,18 +7,9 @@ sessionStorage.removeItem('guessData');
 // Ensure back button is visible immediately
 document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('back-btn');
-    console.log('Back button element:', btn);
     if (btn) {
         // Force all styles with cssText
         btn.style.cssText = 'position: fixed !important; top: 20px !important; left: 20px !important; padding: 12px 20px !important; border: 3px solid #ff6b35 !important; border-radius: 4px !important; font-size: 18px !important; font-weight: 700 !important; cursor: pointer !important; color: white !important; text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5) !important; background-color: #ff6b35 !important; font-family: "VT323", monospace !important; z-index: 999999 !important; display: block !important; visibility: visible !important; opacity: 1 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;';
-        console.log('Back button styles applied');
-        console.log('Button position:', btn.getBoundingClientRect());
-        console.log('Computed display:', window.getComputedStyle(btn).display);
-        console.log('Computed visibility:', window.getComputedStyle(btn).visibility);
-        console.log('Computed opacity:', window.getComputedStyle(btn).opacity);
-        console.log('Computed z-index:', window.getComputedStyle(btn).zIndex);
-    } else {
-        console.error('Back button NOT FOUND in DOM!');
     }
 });
 
@@ -26,12 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 setTimeout(() => {
     const btn = document.getElementById('back-btn');
     if (btn) {
-        console.log('Button found, applying styles...');
-        console.log('Button computed styles:', window.getComputedStyle(btn));
         btn.style.cssText = 'position: fixed !important; top: 20px !important; left: 20px !important; padding: 12px 20px !important; border: 3px solid #ff6b35 !important; border-radius: 4px !important; font-size: 18px !important; font-weight: 700 !important; cursor: pointer !important; color: white !important; text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5) !important; background-color: #ff6b35 !important; font-family: "VT323", monospace !important; z-index: 999999 !important; display: block !important; visibility: visible !important; opacity: 1 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;';
-        console.log('Button after styles:', btn);
-        console.log('Button offset:', btn.offsetTop, btn.offsetLeft);
-        console.log('Button getBoundingClientRect:', btn.getBoundingClientRect());
     }
 }, 100);
 
@@ -753,7 +739,6 @@ if (gameSession.sessionId && gameSession.question) {
 // Handle continue questioning
 async function handleContinue() {
     const targetUrl = window.location.origin + '/';
-    console.log('Redirecting from', window.location.href, 'to:', targetUrl);
     window.location.href = targetUrl;
 }
 
@@ -779,7 +764,6 @@ async function handleGuessResult(correct) {
 
         if (response.ok) {
             const targetUrl = window.location.origin + '/';
-            console.log('Redirecting from', window.location.href, 'to:', targetUrl);
             window.location.href = targetUrl;
         }
     } else {
@@ -813,7 +797,6 @@ async function submitActualAnswer() {
 
     if (response.ok) {
         const targetUrl = window.location.origin + '/';
-        console.log('Redirecting from', window.location.href, 'to:', targetUrl);
         window.location.href = targetUrl;
     }
 }
@@ -848,7 +831,6 @@ if (backBtn) {
         window.location.href = window.location.origin + '/';
     });
 } else {
-    console.error('Back button not found!');
 }
 
 // Handle copyable text - always show "CA: ..." and copy it
@@ -913,7 +895,6 @@ if (backQuestionBtn) {
                 updatedHistory.pop(); // Remove last assistant message (question)
                 updatedHistory.pop(); // Remove last user message (answer)
             } else {
-                console.error('Unexpected conversation history structure:', updatedHistory);
                 alert('Cannot go back: unexpected conversation structure');
                 return;
             }

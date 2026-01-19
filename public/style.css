@@ -894,7 +894,7 @@ body.guess-screen-active #guess-screen .guess-buttons {
     .landingimage {
         width: 280px !important;
         height: 240px !important;
-        margin: -30px auto 10px auto !important;
+        margin: -60px auto 10px auto !important;
     }
     
     .welcome-message {
@@ -1104,6 +1104,7 @@ body.guess-screen-active #guess-screen .guess-buttons {
     .landingimage {
         width: 240px !important;
         height: 200px !important;
+        margin: -60px auto 10px auto !important;
     }
     
     .welcome-message h2 {

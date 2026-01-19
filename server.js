@@ -416,8 +416,7 @@ app.post('/api/game/start', async (req, res) => {
       question: firstQuestion
     });
   } catch (error) {
-    console.error('Error starting game:', error);
-    console.error('Error details:', error.message, error.stack);
+    console.error('Error starting game:', error.message);
     res.status(500).json({ 
       error: 'Failed to start game',
       details: error.message 
@@ -957,8 +956,7 @@ app.post('/api/game/answer', async (req, res) => {
       guessDescription: guessDescription || undefined
     });
   } catch (error) {
-    console.error('Error processing answer:', error);
-    console.error('Error details:', error.message, error.stack);
+    console.error('Error processing answer:', error.message);
     res.status(500).json({ 
       error: 'Failed to process answer',
       details: error.message 
@@ -1209,8 +1207,7 @@ app.post('/api/game/guess-result', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error processing guess result:', error);
-    console.error('Error details:', error.message, error.stack);
+    console.error('Error processing guess result:', error.message);
     res.status(500).json({ 
       error: 'Failed to process guess result',
       details: error.message 

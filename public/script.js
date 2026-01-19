@@ -347,7 +347,6 @@ async function loadGuessImage(guessName, existingImageUrl = null) {
 async function startGame() {
     // Redirect IMMEDIATELY - don't wait for API call
     const targetUrl = window.location.origin + '/guess';
-    console.log('Redirecting to game page immediately:', targetUrl);
     
     // Start API call in background but don't wait for it
     fetch(`${API_BASE}/game/start`, {
@@ -399,7 +398,6 @@ async function submitAnswer(answer) {
         }
 
         const data = await response.json();
-        console.log('Response data:', JSON.stringify(data, null, 2)); // Debug: see what we're getting
         currentQuestionCount = data.questionCount;
         
         // Update progress bar
@@ -413,9 +411,7 @@ async function submitAnswer(answer) {
         }
 
         // Check if this is a guess
-        console.log('isGuess value:', data.isGuess); // Debug: check isGuess
         if (data.isGuess) {
-            console.log('GUESS DETECTED - About to redirect!'); // Debug
             updateProgress(100);
             
             // Store the question before showing guess (so continue can work)
@@ -444,7 +440,6 @@ async function submitAnswer(answer) {
             
             // Redirect to guess page immediately - use absolute path
             const targetUrl = window.location.origin + '/guess';
-            console.log('ABOUT TO REDIRECT from', window.location.href, 'to:', targetUrl);
             // Force immediate redirect - prevent any other code from running
             loading.style.display = 'none';
             answerButtons.forEach(btn => btn.disabled = true);
@@ -456,7 +451,6 @@ async function submitAnswer(answer) {
                     window.location.replace(targetUrl);
                 }
             } catch (e) {
-                console.error('Redirect error:', e);
                 window.location = targetUrl;
             }
             // Force stop execution
