@@ -1,13 +1,17 @@
 html {
-    background-image: url(sky1.jpg);
+    background-image: url(num.gif);
     background-position: center center;
-    background-size: cover;
+    background-size: auto;
     background-repeat: repeat;
     background-attachment: fixed;
     min-height: 100%;
     scroll-behavior: smooth;
     scrollbar-color: #ff6b35 transparent;
     scrollbar-width: thin;
+}
+
+* {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 ::selection {
@@ -65,7 +69,7 @@ body {
     left: 0;
     animation: fadein 2500ms ease-in;
     margin: auto;
-    padding: 0;
+    padding: 0 0 40px 0;
     width: 640px;
     max-width: 100%;
     height: auto;
@@ -76,6 +80,11 @@ body {
     justify-content: center;
     color: #fff5f0;
     box-sizing: border-box;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+body * {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 /* Game screen and guess screen use wider layout */
@@ -432,7 +441,7 @@ body.guess-screen-active .speech-bubble::after {
 
 .welcome-message {
     text-align: center;
-    margin-top: -30px;
+    margin-top: -10px;
     margin-bottom: 0;
     width: 400px;
     max-width: 100%;
@@ -449,14 +458,14 @@ body.guess-screen-active .speech-bubble::after {
 .welcome-message p {
     color: #fff5f0;
     font-size: 14px;
-    margin-bottom: 6px;
+    margin-bottom: 0;
     line-height: 1.5;
     font-family: 'VT323', monospace;
 }
 
 .welcome-message .disclaimer {
     margin: 20px 0;
-    padding: 16px;
+    padding: 10px 10px 10px 10px;
     background: rgba(255, 107, 53, 0.1);
     border: 1px solid rgba(255, 107, 53, 0.3);
     border-radius: 8px;
@@ -472,12 +481,14 @@ body.guess-screen-active .speech-bubble::after {
 }
 
 .welcome-message .disclaimer p:first-child {
-    color: #ff6b35;
+    color: #ff8800;
     font-size: 18px;
+    margin-top: 0;
     margin-bottom: 10px;
     font-style: italic;
     opacity: 1;
     font-weight: bold;
+    text-shadow: 0 0 8px rgba(255, 136, 0, 0.5);
 }
 
 .welcome-message .disclaimer-text {

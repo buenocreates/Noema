@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Noema - Logs</title>
+    <title>Noema - Noema Logs</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -16,15 +16,19 @@
         }
         
         body {
-            background-image: url(sky1.jpg);
+            background-image: url(num.gif);
             background-position: center center;
-            background-size: cover;
+            background-size: auto;
             background-repeat: repeat;
             background-attachment: fixed;
             min-height: 100vh;
             color: #fff5f0;
             font-family: 'VT323', monospace;
             padding: 20px;
+        }
+        
+        body * {
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         }
         
         .container {
@@ -106,10 +110,13 @@
             font-family: 'VT323', monospace;
             font-size: 18px;
             color: #2c2c2c;
+            font-weight: bold;
         }
         
         .search-box input::placeholder {
-            color: #888;
+            color: #2c2c2c;
+            opacity: 0.7;
+            font-weight: normal;
         }
         
         .search-icon {
@@ -118,7 +125,8 @@
             top: 50%;
             transform: translateY(-50%);
             color: #ff6b35;
-            font-size: 18px;
+            font-size: 20px;
+            font-weight: bold;
         }
         
         .filter-select {
@@ -386,15 +394,15 @@
         <a href="/index.html" class="back-link">← Back to Home</a>
         
         <div class="header">
-            <h1>Logs</h1>
-            <p>Browse and search conversations with Noema</p>
+            <h1>Noema Logs</h1>
+            <p>Browse and search user interactions with Noema</p>
         </div>
         
         <div class="stats-bar">
             <div class="stat-item">
                 <div class="stat-label">Total</div>
                 <div class="stat-value" id="total-conversations">0</div>
-                <div class="stat-label" style="font-size: 12px;">conversations</div>
+                <div class="stat-label" style="font-size: 12px;">interactions</div>
             </div>
             <div class="stat-item">
                 <div class="stat-label">Messages</div>
@@ -416,7 +424,7 @@
         <div class="filters-section">
             <div class="search-box">
                 <input type="text" id="search-input" placeholder="Search by session ID or content...">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon">⌕</span>
             </div>
             <select class="filter-select" id="time-filter">
                 <option value="all">All Time</option>
@@ -430,21 +438,21 @@
             </select>
         </div>
         
-        <div class="results-count" id="results-count">0 conversations found</div>
+        <div class="results-count" id="results-count">0 interactions found</div>
         
         <div id="conversations-container" class="conversations-grid">
             <div class="empty-state">
-                <h2>WAITING FOR CONVERSATIONS...</h2>
-                <p>No active conversations yet. Start a game to see Claude in action!</p>
+                <h2>WAITING FOR INTERACTIONS...</h2>
+                <p>No active interactions yet. Start a game to see Neoma in action!</p>
             </div>
         </div>
     </div>
     
-    <!-- Modal for viewing full conversation -->
+    <!-- Modal for viewing full interaction -->
     <div id="conversation-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modal-title">Conversation Details</h2>
+                <h2 id="modal-title">Interaction Details</h2>
                 <button class="close-btn" id="close-modal">Close</button>
             </div>
             <div id="modal-messages" class="modal-messages"></div>
@@ -545,13 +553,13 @@
         function renderConversations() {
             const container = document.getElementById('conversations-container');
             document.getElementById('results-count').textContent = 
-                `${filteredConversations.length} conversation${filteredConversations.length !== 1 ? 's' : ''} found`;
+                `${filteredConversations.length} interaction${filteredConversations.length !== 1 ? 's' : ''} found`;
             
             if (filteredConversations.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state" style="grid-column: 1 / -1;">
-                        <h2>NO CONVERSATIONS FOUND</h2>
-                        <p>Try adjusting your filters or wait for new conversations.</p>
+                        <h2>NO INTERACTIONS FOUND</h2>
+                        <p>Try adjusting your filters or wait for new interactions.</p>
                     </div>
                 `;
                 return;

@@ -3,6 +3,7 @@ const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs').promises;
 const path = require('path');
+const { MongoClient } = require('mongodb');
 require('dotenv').config();
 
 const app = express();
@@ -25,11 +26,37 @@ if (!process.env.ANTHROPIC_API_KEY) {
 // Store game sessions
 const gameSessions = new Map();
 
-// Store conversation logs for monitoring
+// MongoDB connection
+let mongoClient = null;
+let db = null;
+let interactionsCollection = null;
+
+// Initialize MongoDB connection
+async function initMongoDB() {
+  try {
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      console.warn('MONGODB_URI not set. Interactions will not be saved to database.');
+      return;
+    }
+    
+    mongoClient = new MongoClient(mongoUri);
+    await mongoClient.connect();
+    db = mongoClient.db('noema');
+    interactionsCollection = db.collection('interactions');
+    console.log('Connected to MongoDB Atlas');
+  } catch (error) {
+    console.error('Error connecting to MongoDB:', error);
+    console.warn('Continuing without database. Interactions will not be persisted.');
+  }
+}
+
+// Store conversation logs for monitoring (in-memory fallback)
 const conversationLogs = new Map();
 
-// Helper function to update conversation logs
-function updateConversationLog(sessionId, conversationHistory) {
+// Helper function to update conversation logs (saves to MongoDB)
+async function updateConversationLog(sessionId, conversationHistory) {
+  // Update in-memory cache
   if (conversationLogs.has(sessionId)) {
     conversationLogs.get(sessionId).messages = [...conversationHistory];
     conversationLogs.get(sessionId).lastUpdate = Date.now();
@@ -39,6 +66,29 @@ function updateConversationLog(sessionId, conversationHistory) {
       messages: [...conversationHistory],
       lastUpdate: Date.now()
     });
+  }
+  
+  // Save to MongoDB (permanent storage)
+  if (interactionsCollection) {
+    try {
+      await interactionsCollection.updateOne(
+        { sessionId: sessionId },
+        {
+          $set: {
+            sessionId: sessionId,
+            messages: conversationHistory,
+            lastUpdate: Date.now(),
+            updatedAt: new Date()
+          },
+          $setOnInsert: {
+            createdAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+    } catch (error) {
+      console.error('Error saving interaction to MongoDB:', error);
+    }
   }
 }
 
@@ -288,7 +338,7 @@ async function getInfoForGuess(name) {
   } catch (error) {
       // Continue to next variation
       continue;
-    }
+  }
   }
   
   return { imageUrl: null, description: null };
@@ -346,11 +396,7 @@ app.post('/api/game/start', async (req, res) => {
     });
     
     // Log conversation for monitoring
-    conversationLogs.set(sessionId, {
-      sessionId,
-      messages: [...conversationHistory],
-      lastUpdate: Date.now()
-    });
+    await updateConversationLog(sessionId, conversationHistory);
 
     res.json({
       sessionId,
@@ -843,7 +889,7 @@ app.post('/api/game/answer', async (req, res) => {
       role: 'assistant',
       content: response
     });
-    
+
     updateConversationLog(sessionId, session.conversationHistory);
 
     // Calculate progress based on questions and confidence
@@ -935,7 +981,7 @@ app.post('/api/game/guess-result', async (req, res) => {
         content: 'Yes, that\'s correct!'
       });
       
-      updateConversationLog(sessionId, session.conversationHistory);
+      await updateConversationLog(sessionId, session.conversationHistory);
     } else {
       // Save wrong guess to learning data
       const lastGuess = session.conversationHistory
@@ -952,10 +998,10 @@ app.post('/api/game/guess-result', async (req, res) => {
         role: 'user',
         content: `No, that's not correct. ${actualAnswer ? `The correct answer is: ${actualAnswer}` : 'Please ask more questions.'}`
       });
+
+      await updateConversationLog(sessionId, session.conversationHistory);
       
-      updateConversationLog(sessionId, session.conversationHistory);
-      
-      updateConversationLog(sessionId, session.conversationHistory);
+      await updateConversationLog(sessionId, session.conversationHistory);
 
       // Continue asking questions - use limited history and fewer tokens
       const recentHistory = session.conversationHistory.slice(-10);
@@ -1142,7 +1188,7 @@ app.post('/api/game/guess-result', async (req, res) => {
         content: nextQuestion
       });
       
-      updateConversationLog(sessionId, session.conversationHistory);
+      await updateConversationLog(sessionId, session.conversationHistory);
 
       return res.json({
         question: nextQuestion,
@@ -1159,6 +1205,49 @@ app.post('/api/game/guess-result', async (req, res) => {
   }
 });
 
+// API endpoint to get all interactions for monitoring
+app.get('/api/monitor/conversations', async (req, res) => {
+  try {
+    let interactions = [];
+    
+    // Try to fetch from MongoDB first
+    if (interactionsCollection) {
+      try {
+        const dbInteractions = await interactionsCollection.find({}).toArray();
+        interactions = dbInteractions.map(interaction => ({
+          sessionId: interaction.sessionId,
+          messages: interaction.messages || [],
+          lastUpdate: interaction.lastUpdate || interaction.updatedAt?.getTime() || Date.now()
+        }));
+      } catch (error) {
+        console.error('Error fetching from MongoDB:', error);
+        // Fall back to in-memory cache
+        interactions = Array.from(conversationLogs.values());
+      }
+    } else {
+      // Fall back to in-memory cache if MongoDB not available
+      interactions = Array.from(conversationLogs.values());
+    }
+    
+    res.json({ conversations: interactions });
+  } catch (error) {
+    console.error('Error fetching interactions:', error);
+    res.status(500).json({ error: 'Failed to fetch interactions' });
+  }
+});
+
+// Initialize MongoDB and start server
+async function startServer() {
+  await initMongoDB();
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+    if (interactionsCollection) {
+      console.log('Interactions are being saved to MongoDB Atlas');
+    } else {
+      console.log('Warning: MongoDB not connected. Interactions will only be stored in memory.');
+    }
 });
+}
+
+startServer();
