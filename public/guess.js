@@ -40,6 +40,7 @@ const gameSession = {};
 const guessData = {};
 let sessionId = null;
 let currentQuestionCount = 0;
+let conversationHistory = []; // Store conversation history locally
 
 // DOM elements
 const gameScreen = document.getElementById('game-screen');
@@ -59,6 +60,8 @@ const wrongInput = document.getElementById('wrong-input');
 const actualAnswerInput = document.getElementById('actual-answer');
 const submitAnswerBtn = document.getElementById('submit-answer-btn');
 const backBtn = document.getElementById('back-btn');
+const backQuestionBtn = document.getElementById('back-question-btn');
+const copyText = document.getElementById('copy-text');
 
 // Initialize 3D models immediately - don't wait for DOMContentLoaded
 // Start loading both models right away
@@ -291,12 +294,20 @@ function showScreen(screen) {
     if (screen.id === 'guess-screen') {
         document.body.classList.add('guess-screen-active');
         document.body.classList.remove('game-screen-active');
+        // Show back button for guess screen
+        if (backBtn) backBtn.style.display = 'block';
+        if (backQuestionBtn) backQuestionBtn.style.display = 'none';
     } else if (screen.id === 'game-screen') {
         document.body.classList.add('game-screen-active');
         document.body.classList.remove('guess-screen-active');
+        // Show back question button if we have history (after first question)
+        if (backQuestionBtn && conversationHistory.length > 2) {
+            backQuestionBtn.style.display = 'flex';
+        } else if (backQuestionBtn) {
+            backQuestionBtn.style.display = 'none';
+        }
+        if (backBtn) backBtn.style.display = 'none';
     }
-    // Back button is always visible on guess.html page
-    if (backBtn) backBtn.style.display = 'block';
 }
 
 // Initialize 3D model for game screen (same as home page with cursor tracking and glow)
@@ -474,7 +485,8 @@ async function submitAnswer(answer) {
             },
             body: JSON.stringify({
                 sessionId,
-                answer
+                answer,
+                conversationHistory: conversationHistory
             })
         });
 
@@ -519,6 +531,21 @@ async function submitAnswer(answer) {
 
         const data = await response.json();
         currentQuestionCount = data.questionCount;
+        
+        // Store conversation history locally
+        conversationHistory.push({
+            role: 'user',
+            content: answer
+        });
+        conversationHistory.push({
+            role: 'assistant',
+            content: data.question
+        });
+        
+        // Show back button if we have history (after first question)
+        if (backQuestionBtn && conversationHistory.length > 2) {
+            backQuestionBtn.style.display = 'flex';
+        }
         
         // Check if this is a guess
         if (data.isGuess) {
@@ -586,10 +613,20 @@ if (gameSession.sessionId && gameSession.question) {
     if (questionNumber) {
         questionNumber.style.animation = 'fadein 400ms ease-in 2000ms both';
     }
+    // Initialize conversation history with first question
+    conversationHistory = [{
+        role: 'assistant',
+        content: gameSession.question
+    }];
     questionText.textContent = gameSession.question;
     currentQuestionCount = gameSession.questionCount || 1;
     if (questionNumber) {
         questionNumber.textContent = `${currentQuestionCount}.`;
+    }
+    
+    // Hide back button on first question
+    if (backQuestionBtn) {
+        backQuestionBtn.style.display = 'none';
     }
     
     // 3D model already initialized at page load
@@ -613,6 +650,13 @@ if (gameSession.sessionId && gameSession.question) {
         return response.json();
     }).then(data => {
         sessionId = data.sessionId;
+        
+        // Initialize conversation history with first question
+        conversationHistory = [{
+            role: 'assistant',
+            content: data.question
+        }];
+        
         sessionStorage.setItem('gameSession', JSON.stringify({
             sessionId: data.sessionId,
             question: data.question,
@@ -623,6 +667,11 @@ if (gameSession.sessionId && gameSession.question) {
         currentQuestionCount = 1;
         if (questionNumber) {
             questionNumber.textContent = `${currentQuestionCount}.`;
+        }
+        
+        // Hide back button on first question
+        if (backQuestionBtn) {
+            backQuestionBtn.style.display = 'none';
         }
         
         // 3D model already initialized at page load
@@ -759,4 +808,118 @@ if (backBtn) {
     });
 } else {
     console.error('Back button not found!');
+}
+
+// Handle copyable text - always show "CA: ..." and copy it
+if (copyText) {
+    // Always show "CA: ..."
+    copyText.textContent = 'CA: ...';
+    
+    // Copy to clipboard on click
+    copyText.addEventListener('click', async () => {
+        const textToCopy = '...';
+        
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            // Visual feedback - white color
+            const originalText = copyText.textContent;
+            copyText.textContent = 'Copied!';
+            copyText.style.color = '#ffffff';
+            setTimeout(() => {
+                copyText.textContent = 'CA: ...';
+                copyText.style.color = '#ff6b35';
+            }, 1000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            const originalText = copyText.textContent;
+            copyText.textContent = 'Copied!';
+            copyText.style.color = '#ffffff';
+            setTimeout(() => {
+                copyText.textContent = 'CA: ...';
+                copyText.style.color = '#ff6b35';
+            }, 1000);
+        }
+    });
+}
+
+// Handle back button for questions - go back one question
+if (backQuestionBtn) {
+    backQuestionBtn.addEventListener('click', async () => {
+        // Need at least 2 messages (one question and one answer) to go back
+        if (conversationHistory.length < 2) {
+            // Can't go back if no history
+            return;
+        }
+        
+        // Make a copy before modifying
+        const updatedHistory = [...conversationHistory];
+        
+        // Remove last question and answer from local history
+        // Last message should be assistant (question), second to last should be user (answer)
+        if (updatedHistory.length >= 2) {
+            updatedHistory.pop(); // Remove last assistant message (question)
+            updatedHistory.pop(); // Remove last user message (answer)
+        }
+        
+        // Update server with new history and get previous question
+        try {
+            answerButtons.forEach(btn => btn.disabled = true);
+            
+            const response = await fetch(`${API_BASE}/game/answer`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sessionId,
+                    answer: '',
+                    conversationHistory: updatedHistory,
+                    goBack: true
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to go back');
+            }
+            
+            const data = await response.json();
+            
+            if (!data.question) {
+                throw new Error('No question returned from server');
+            }
+            
+            currentQuestionCount = data.questionCount || updatedHistory.filter(m => m.role === 'assistant').length;
+            
+            // Update local conversation history
+            conversationHistory.length = 0;
+            conversationHistory.push(...updatedHistory);
+            
+            // Update UI
+            questionText.textContent = data.question;
+            if (questionNumber) {
+                questionNumber.textContent = `${currentQuestionCount}.`;
+            }
+            
+            // Hide back button if we're at the first question
+            if (backQuestionBtn && updatedHistory.length <= 2) {
+                backQuestionBtn.style.display = 'none';
+            } else if (backQuestionBtn) {
+                backQuestionBtn.style.display = 'flex';
+            }
+            
+            answerButtons.forEach(btn => btn.disabled = false);
+        } catch (error) {
+            console.error('Error going back:', error);
+            alert('Failed to go back: ' + error.message);
+            answerButtons.forEach(btn => btn.disabled = false);
+        }
+    });
 }

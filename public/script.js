@@ -661,3 +661,43 @@ playAgainBtn.addEventListener('click', () => {
     updateProgress(0);
     showScreen(startScreen);
 });
+
+// Handle copyable text - always show "CA: ..." and copy it
+const copyText = document.getElementById('copy-text');
+if (copyText) {
+    // Always show "CA: ..."
+    copyText.textContent = 'CA: ...';
+    
+    // Copy to clipboard on click
+    copyText.addEventListener('click', async () => {
+        const textToCopy = '...';
+        
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            // Visual feedback - white color
+            const originalText = copyText.textContent;
+            copyText.textContent = 'Copied!';
+            copyText.style.color = '#ffffff';
+            setTimeout(() => {
+                copyText.textContent = 'CA: ...';
+                copyText.style.color = '#ff6b35';
+            }, 1000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            const originalText = copyText.textContent;
+            copyText.textContent = 'Copied!';
+            copyText.style.color = '#ffffff';
+            setTimeout(() => {
+                copyText.textContent = 'CA: ...';
+                copyText.style.color = '#ff6b35';
+            }, 1000);
+        }
+    });
+}

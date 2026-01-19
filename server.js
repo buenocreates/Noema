@@ -302,17 +302,51 @@ app.post('/api/game/start', async (req, res) => {
 // Submit an answer and get next question
 app.post('/api/game/answer', async (req, res) => {
   try {
-    const { sessionId, answer } = req.body;
+    const { sessionId, answer, conversationHistory: clientHistory, goBack } = req.body;
 
     if (!gameSessions.has(sessionId)) {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
     const session = gameSessions.get(sessionId);
-    session.conversationHistory.push({
-      role: 'user',
-      content: answer
-    });
+    
+    // If going back, restore the conversation history
+    if (goBack) {
+      if (!clientHistory || !Array.isArray(clientHistory)) {
+        return res.status(400).json({ error: 'Invalid conversation history' });
+      }
+      
+      session.conversationHistory = [...clientHistory];
+      // Return the last question from history
+      const lastQuestion = session.conversationHistory
+        .filter(m => m.role === 'assistant')
+        .slice(-1)[0];
+      
+      if (lastQuestion) {
+        const questionCount = session.conversationHistory.filter(m => m.role === 'assistant').length;
+        return res.json({
+          question: lastQuestion.content,
+          isGuess: false,
+          questionCount: questionCount
+        });
+      } else {
+        // No question found in history, return error
+        return res.status(400).json({ error: 'No previous question found' });
+      }
+    }
+    
+    // If client sends conversation history (for syncing), use it
+    if (clientHistory && Array.isArray(clientHistory) && !goBack) {
+      session.conversationHistory = [...clientHistory];
+    }
+    
+    // Only add answer if not going back
+    if (!goBack) {
+      session.conversationHistory.push({
+        role: 'user',
+        content: answer
+      });
+    }
 
     // Track answer patterns for confidence calculation
     const recentAnswers = session.conversationHistory

@@ -321,6 +321,37 @@
             justify-content: center;
         }
         
+        .btn-back-question {
+            padding: 4px 8px;
+            border: 2px inset #3f3f3f;
+            border-radius: 2px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 200ms ease;
+            color: white;
+            text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
+            background-color: #c5c5c5;
+            font-family: 'VT323', monospace;
+            flex: 0 0 auto;
+            min-width: 28px;
+            box-sizing: border-box;
+            text-align: center;
+            line-height: 1;
+            min-height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-back-question:hover {
+            filter: brightness(110%);
+        }
+        
+        .btn-back-question:active {
+            border: 2px outset #3f3f3f;
+        }
+        
         .btn-answer:hover {
             filter: brightness(110%);
         }
@@ -352,6 +383,37 @@
         
         .btn-no {
             background-color: #f44336;
+        }
+        
+        .btn-back-question {
+            padding: 4px 8px;
+            border: 2px inset #3f3f3f;
+            border-radius: 2px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 200ms ease;
+            color: white;
+            text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
+            background-color: #c5c5c5;
+            font-family: 'VT323', monospace;
+            flex: 0 0 auto;
+            min-width: 28px;
+            box-sizing: border-box;
+            text-align: center;
+            line-height: 1;
+            min-height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-back-question:hover {
+            filter: brightness(110%);
+        }
+        
+        .btn-back-question:active {
+            border: 2px outset #3f3f3f;
         }
         
         #noema3d-canvas-game {
@@ -432,6 +494,9 @@
     <!-- Back Button (always visible on guess.html page) - MOVED TO TOP -->
     <button id="back-btn" class="back-button" style="position: fixed !important; top: 20px !important; left: 20px !important; padding: 12px 20px !important; border: 3px solid #ff6b35 !important; border-radius: 4px !important; font-size: 18px !important; font-weight: 700 !important; cursor: pointer !important; color: white !important; text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5) !important; background-color: #ff6b35 !important; font-family: 'VT323', monospace !important; z-index: 99999 !important; display: block !important; visibility: visible !important; opacity: 1 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;">← Back to Home</button>
     
+    <!-- Copyable text in top right -->
+    <span id="copy-text" class="copy-text" style="position: fixed !important; top: 20px !important; right: 20px !important; font-family: 'VT323', monospace !important; font-size: 24px !important; color: #ff6b35 !important; cursor: pointer !important; z-index: 99999 !important; user-select: none !important; text-decoration: underline !important;">CA: ...</span>
+    
     <!-- Game Screen (Questions) -->
     <div id="game-screen" class="screen">
         <div class="page-container">
@@ -451,6 +516,7 @@
                     <button class="btn-answer btn-dont-know" data-answer="Don't know">Don't know</button>
                     <button class="btn-answer btn-probably-not" data-answer="Probably not">Probably not</button>
                     <button class="btn-answer btn-no" data-answer="No">No</button>
+                    <button id="back-question-btn" class="btn-back-question" style="display: none;">←</button>
                 </div>
             </div>
         </div>
