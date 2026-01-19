@@ -10,6 +10,7 @@ let currentQuestionCount = gameSession.questionCount || 0;
 const gameScreen = document.getElementById('game-screen');
 const guessScreen = document.getElementById('guess-screen');
 const questionText = document.getElementById('question-text');
+const questionNumber = document.getElementById('question-number');
 const answerButtons = document.querySelectorAll('.btn-answer');
 const loading = document.getElementById('loading');
 const guessQuestionNumber = document.getElementById('guess-question-number');
@@ -34,7 +35,18 @@ if (document.readyState === 'loading') {
     initGuessPage3DModel();
 }
 
-// Copy 3D model initialization code here for guess page
+// 3D Model variables for guess page
+let scene3DGuess, camera3DGuess, renderer3DGuess, model3DGuess;
+let mouseXGuess = 0;
+let mouseYGuess = 0;
+let targetRotationYGuess = 0;
+let targetRotationXGuess = 0;
+let currentRotationYGuess = 0;
+let currentRotationXGuess = 0;
+const rotationSensitivityGuess = 0.002;
+const rotationSmoothingGuess = 0.1;
+
+// Copy full 3D model initialization code from home page (with glow and all lighting)
 async function initGuessPage3DModel() {
     try {
         const { Scene, PerspectiveCamera, WebGLRenderer, AmbientLight, DirectionalLight, PointLight, HemisphereLight, Box3, Vector3 } = await import('three');
@@ -43,57 +55,174 @@ async function initGuessPage3DModel() {
         const canvas = document.getElementById('noema3d-canvas-guess');
         if (!canvas) return;
 
-        const scene3D = new Scene();
-        scene3D.background = null;
+        // Scene setup
+        scene3DGuess = new Scene();
+        scene3DGuess.background = null;
 
-        const width = 300;
-        const height = 350;
-        const camera3D = new PerspectiveCamera(50, width / height, 0.1, 1000);
-        camera3D.position.set(0, 0, 3);
+        // Camera setup
+        const width = 320;
+        const height = 380;
+        camera3DGuess = new PerspectiveCamera(50, width / height, 0.1, 1000);
+        camera3DGuess.position.set(0, 0, 3);
 
-        const renderer3D = new WebGLRenderer({ 
+        // Renderer setup
+        renderer3DGuess = new WebGLRenderer({ 
             canvas: canvas, 
             alpha: true, 
             antialias: true 
         });
-        renderer3D.setSize(width, height);
-        renderer3D.setPixelRatio(window.devicePixelRatio);
+        renderer3DGuess.setSize(width, height);
+        renderer3DGuess.setPixelRatio(window.devicePixelRatio);
 
-        // Lighting
+        // Track mouse movement for rotation
+        const handleMouseMove = (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const deltaX = event.clientX - centerX;
+            const deltaY = event.clientY - centerY;
+            
+            const refDistance = 800;
+            targetRotationYGuess = Math.atan2(deltaX, refDistance) * 0.3;
+            targetRotationXGuess = Math.atan2(deltaY, refDistance) * 0.3;
+            
+            const threshold = 20;
+            if (Math.abs(deltaX) < threshold && Math.abs(deltaY) < threshold) {
+                targetRotationYGuess = 0;
+                targetRotationXGuess = 0;
+            }
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+
+        // Enhanced lighting setup - same as home page
         const ambientLight = new AmbientLight(0xffffff, 1.5);
-        scene3D.add(ambientLight);
+        scene3DGuess.add(ambientLight);
+
         const hemisphereLight = new HemisphereLight(0xffdd99, 0xaaaaff, 2.0);
-        scene3D.add(hemisphereLight);
+        scene3DGuess.add(hemisphereLight);
+
         const mainLight = new DirectionalLight(0xffdd99, 3.5);
         mainLight.position.set(5, 5, 5);
-        scene3D.add(mainLight);
+        mainLight.castShadow = false;
+        scene3DGuess.add(mainLight);
 
-        // Load model
+        const fillLight = new DirectionalLight(0xffcc99, 2.5);
+        fillLight.position.set(-5, 3, -5);
+        scene3DGuess.add(fillLight);
+
+        const rimLight = new DirectionalLight(0xffffff, 2.0);
+        rimLight.position.set(0, -5, -5);
+        scene3DGuess.add(rimLight);
+
+        const sideLight = new DirectionalLight(0xffaa66, 2.0);
+        sideLight.position.set(0, 0, 5);
+        scene3DGuess.add(sideLight);
+
+        const pointLight1 = new PointLight(0xffdd99, 3.0, 20);
+        pointLight1.position.set(4, 4, 4);
+        scene3DGuess.add(pointLight1);
+
+        const pointLight2 = new PointLight(0xffcc99, 2.5, 20);
+        pointLight2.position.set(-4, -4, -4);
+        scene3DGuess.add(pointLight2);
+
+        const pointLight3 = new PointLight(0xffffff, 2.0, 18);
+        pointLight3.position.set(0, 5, 0);
+        scene3DGuess.add(pointLight3);
+
+        const pointLight4 = new PointLight(0xffaa66, 1.8, 18);
+        pointLight4.position.set(5, 0, 0);
+        scene3DGuess.add(pointLight4);
+
+        const pointLight5 = new PointLight(0xffaa66, 1.8, 18);
+        pointLight5.position.set(-5, 0, 0);
+        scene3DGuess.add(pointLight5);
+
+        // Load GLB model
         const loader = new GLTFLoader();
         loader.load(
             'noema3d.glb',
             (gltf) => {
-                const model3D = gltf.scene;
-                const box = new Box3().setFromObject(model3D);
+                model3DGuess = gltf.scene;
+                
+                // Make model materials reflective and brighter (same as home page)
+                model3DGuess.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = false;
+                        child.receiveShadow = false;
+                        
+                        if (child.material) {
+                            const materials = Array.isArray(child.material) ? child.material : [child.material];
+                            
+                            materials.forEach((material) => {
+                                if (material.emissive !== undefined) {
+                                    material.emissive.setHex(0x664422);
+                                    material.emissiveIntensity = 0.15;
+                                }
+                                
+                                if (material.metalness !== undefined) {
+                                    material.metalness = 0.6;
+                                }
+                                if (material.roughness !== undefined) {
+                                    material.roughness = 0.3;
+                                }
+                                
+                                if (material.color) {
+                                    const currentColor = material.color.clone();
+                                    material.color = currentColor.multiplyScalar(1.3);
+                                }
+                                
+                                material.needsUpdate = true;
+                            });
+                            
+                            if (!Array.isArray(child.material)) {
+                                child.material = materials[0];
+                            }
+                        }
+                    }
+                });
+                
+                // Center and scale model
+                const box = new Box3().setFromObject(model3DGuess);
                 const center = box.getCenter(new Vector3());
                 const size = box.getSize(new Vector3());
                 const maxDim = Math.max(size.x, size.y, size.z);
                 const scale = 2.0 / maxDim;
-                model3D.scale.multiplyScalar(scale);
-                model3D.position.sub(center.multiplyScalar(scale));
-                scene3D.add(model3D);
                 
-                function animate() {
-                    requestAnimationFrame(animate);
-                    renderer3D.render(scene3D, camera3D);
-                }
-                animate();
+                model3DGuess.scale.multiplyScalar(scale);
+                model3DGuess.position.sub(center.multiplyScalar(scale));
+                
+                scene3DGuess.add(model3DGuess);
+                animateGuess3D();
             },
-            undefined,
+            (progress) => {
+                if (progress.lengthComputable) {
+                    console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+                }
+            },
             (error) => console.error('Error loading 3D model:', error)
         );
     } catch (error) {
         console.error('Error initializing 3D model:', error);
+    }
+}
+
+function animateGuess3D() {
+    requestAnimationFrame(animateGuess3D);
+    
+    if (model3DGuess) {
+        currentRotationYGuess += (targetRotationYGuess - currentRotationYGuess) * rotationSmoothingGuess;
+        currentRotationXGuess += (targetRotationXGuess - currentRotationXGuess) * rotationSmoothingGuess;
+        
+        model3DGuess.rotation.y = currentRotationYGuess;
+        model3DGuess.rotation.x = currentRotationXGuess;
+        model3DGuess.rotation.z = 0;
+    }
+    
+    if (renderer3DGuess && scene3DGuess && camera3DGuess) {
+        renderer3DGuess.render(scene3DGuess, camera3DGuess);
     }
 }
 
@@ -237,6 +366,9 @@ async function submitAnswer(answer) {
         } else {
             // Continue with questions
             questionText.textContent = data.question;
+            if (questionNumber) {
+                questionNumber.textContent = `Question ${currentQuestionCount}`;
+            }
         }
 
         loading.style.display = 'none';
