@@ -864,8 +864,18 @@ if (backQuestionBtn) {
         // Remove last question and answer from local history
         // Last message should be assistant (question), second to last should be user (answer)
         if (updatedHistory.length >= 2) {
-            updatedHistory.pop(); // Remove last assistant message (question)
-            updatedHistory.pop(); // Remove last user message (answer)
+            const lastMsg = updatedHistory[updatedHistory.length - 1];
+            const secondLastMsg = updatedHistory[updatedHistory.length - 2];
+            
+            // Verify structure before removing
+            if (lastMsg && lastMsg.role === 'assistant' && secondLastMsg && secondLastMsg.role === 'user') {
+                updatedHistory.pop(); // Remove last assistant message (question)
+                updatedHistory.pop(); // Remove last user message (answer)
+            } else {
+                console.error('Unexpected conversation history structure:', updatedHistory);
+                alert('Cannot go back: unexpected conversation structure');
+                return;
+            }
         }
         
         // Update server with new history and get previous question

@@ -312,26 +312,37 @@ app.post('/api/game/answer', async (req, res) => {
     
     // If going back, restore the conversation history
     if (goBack) {
-      if (!clientHistory || !Array.isArray(clientHistory)) {
-        return res.status(400).json({ error: 'Invalid conversation history' });
-      }
-      
-      session.conversationHistory = [...clientHistory];
-      // Return the last question from history
-      const lastQuestion = session.conversationHistory
-        .filter(m => m.role === 'assistant')
-        .slice(-1)[0];
-      
-      if (lastQuestion) {
-        const questionCount = session.conversationHistory.filter(m => m.role === 'assistant').length;
-        return res.json({
-          question: lastQuestion.content,
-          isGuess: false,
-          questionCount: questionCount
+      try {
+        if (!clientHistory || !Array.isArray(clientHistory)) {
+          return res.status(400).json({ error: 'Invalid conversation history' });
+        }
+        
+        if (clientHistory.length === 0) {
+          return res.status(400).json({ error: 'Empty conversation history' });
+        }
+        
+        session.conversationHistory = [...clientHistory];
+        // Return the last question from history
+        const assistantMessages = session.conversationHistory.filter(m => m && m.role === 'assistant');
+        const lastQuestion = assistantMessages[assistantMessages.length - 1];
+        
+        if (lastQuestion && lastQuestion.content) {
+          const questionCount = assistantMessages.length;
+          return res.json({
+            question: lastQuestion.content,
+            isGuess: false,
+            questionCount: questionCount
+          });
+        } else {
+          // No question found in history, return error
+          return res.status(400).json({ error: 'No previous question found in history' });
+        }
+      } catch (goBackError) {
+        console.error('Error in goBack handler:', goBackError);
+        return res.status(500).json({ 
+          error: 'Failed to go back',
+          details: goBackError.message 
         });
-      } else {
-        // No question found in history, return error
-        return res.status(400).json({ error: 'No previous question found' });
       }
     }
     
@@ -415,8 +426,6 @@ app.post('/api/game/answer', async (req, res) => {
 
     let guessName = null;
     let guessInfo = null;
-
-    let guessName = null;
     
     if (isGuess) {
       guessName = extractGuessName(response);
