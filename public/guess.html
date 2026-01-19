@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Noema - Guess</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,6 +46,64 @@
             align-items: center;
             justify-content: center;
             box-sizing: border-box;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                width: 100% !important;
+                padding: 0 !important;
+            }
+            
+            .page-container {
+                flex-direction: column !important;
+                padding: 20px 15px !important;
+                gap: 20px !important;
+            }
+            
+            .model-section {
+                width: 100% !important;
+                max-width: 280px !important;
+                height: 240px !important;
+                margin: 0 auto !important;
+            }
+            
+            .content-section {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .guess-page-container {
+                padding: 20px 15px !important;
+                gap: 20px !important;
+            }
+            
+            .guess-bubble {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 15px !important;
+            }
+            
+            .guess-text {
+                font-size: 20px !important;
+            }
+            
+            .guess-description {
+                font-size: 13px !important;
+            }
+            
+            .guess-image-container {
+                width: 100% !important;
+            }
+            
+            .guess-image {
+                max-width: 180px !important;
+                max-height: 180px !important;
+            }
+            
+            .back-button-question {
+                font-size: 14px !important;
+                padding: 8px 12px !important;
+            }
         }
         
         .page-container {

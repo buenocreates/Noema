@@ -8,6 +8,7 @@ html {
     scroll-behavior: smooth;
     scrollbar-color: #ff6b35 transparent;
     scrollbar-width: thin;
+    background-color: #000000;
 }
 
 * {
@@ -81,6 +82,7 @@ body {
     color: #fff5f0;
     box-sizing: border-box;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    background-color: transparent;
 }
 
 body * {
@@ -167,7 +169,7 @@ header a h1 {
     position: relative;
     z-index: 0;
     margin: 0 auto;
-    margin-top: -40px;
+    margin-top: -60px;
     width: 400px;
     max-width: 100%;
     height: 280px;
@@ -886,13 +888,13 @@ body.guess-screen-active #guess-screen .guess-buttons {
     }
     
     header p {
-        font-size: 14px !important;
+        display: none !important;
     }
     
     .landingimage {
         width: 280px !important;
         height: 240px !important;
-        margin: 10px auto !important;
+        margin: -30px auto 10px auto !important;
     }
     
     .welcome-message {
@@ -1034,6 +1036,63 @@ body.guess-screen-active #guess-screen .guess-buttons {
     .social-link svg {
         width: 20px !important;
         height: 20px !important;
+    }
+    
+    /* Guess page mobile styles */
+    body.guess-screen-active {
+        width: 100% !important;
+        padding: 0 !important;
+    }
+    
+    .page-container {
+        flex-direction: column !important;
+        padding: 20px 15px !important;
+        gap: 20px !important;
+    }
+    
+    .model-section {
+        width: 100% !important;
+        max-width: 280px !important;
+        height: 240px !important;
+        margin: 0 auto !important;
+    }
+    
+    .content-section {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    .guess-page-container {
+        padding: 20px 15px !important;
+        gap: 20px !important;
+    }
+    
+    .guess-bubble {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 15px !important;
+    }
+    
+    .guess-text {
+        font-size: 20px !important;
+    }
+    
+    .guess-description {
+        font-size: 13px !important;
+    }
+    
+    .guess-image-container {
+        width: 100% !important;
+    }
+    
+    .guess-image {
+        max-width: 180px !important;
+        max-height: 180px !important;
+    }
+    
+    .back-button-question {
+        font-size: 14px !important;
+        padding: 8px 12px !important;
     }
 }
 
