@@ -25,6 +25,23 @@ if (!process.env.ANTHROPIC_API_KEY) {
 // Store game sessions
 const gameSessions = new Map();
 
+// Store conversation logs for monitoring
+const conversationLogs = new Map();
+
+// Helper function to update conversation logs
+function updateConversationLog(sessionId, conversationHistory) {
+  if (conversationLogs.has(sessionId)) {
+    conversationLogs.get(sessionId).messages = [...conversationHistory];
+    conversationLogs.get(sessionId).lastUpdate = Date.now();
+  } else {
+    conversationLogs.set(sessionId, {
+      sessionId,
+      messages: [...conversationHistory],
+      lastUpdate: Date.now()
+    });
+  }
+}
+
 // Learning data file path
 const LEARNING_FILE = path.join(__dirname, 'learning-data.json');
 
@@ -32,10 +49,15 @@ const LEARNING_FILE = path.join(__dirname, 'learning-data.json');
 async function loadLearningData() {
   try {
     const data = await fs.readFile(LEARNING_FILE, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    // Ensure backward compatibility
+    if (!parsed.learnedCharacters) {
+      parsed.learnedCharacters = [];
+    }
+    return parsed;
   } catch (error) {
     // File doesn't exist yet, return empty structure
-    return { wrongGuesses: [], correctAnswers: [], questionPatterns: [] };
+    return { wrongGuesses: [], correctAnswers: [], questionPatterns: [], learnedCharacters: [] };
   }
 }
 
@@ -48,15 +70,83 @@ async function saveLearningData(data) {
   }
 }
 
-// Add wrong guess to learning data
+// Add wrong guess to learning data with full learning information
 async function addWrongGuess(correctAnswer, guess, conversationHistory) {
   const learningData = await loadLearningData();
+  
+  // Extract Q&A pairs from conversation history
+  const qaPairs = [];
+  for (let i = 0; i < conversationHistory.length - 1; i++) {
+    const msg = conversationHistory[i];
+    const nextMsg = conversationHistory[i + 1];
+    if (msg.role === 'assistant' && nextMsg.role === 'user') {
+      qaPairs.push({
+        question: msg.content,
+        answer: nextMsg.content.toLowerCase()
+      });
+    }
+  }
+  
+  // Fetch information about the correct answer
+  let correctInfo = {
+    name: correctAnswer,
+    imageUrl: null,
+    description: null
+  };
+  
+  try {
+    const info = await getInfoForGuess(correctAnswer);
+    correctInfo = {
+      name: correctAnswer,
+      imageUrl: info.imageUrl || null,
+      description: info.description || null
+    };
+  } catch (error) {
+    console.error('Error fetching info for correct answer:', error);
+  }
+  
+  // Store comprehensive learning data
   learningData.wrongGuesses.push({
-    correctAnswer,
+    correctAnswer: correctInfo.name,
+    correctImageUrl: correctInfo.imageUrl,
+    correctDescription: correctInfo.description,
     wrongGuess: guess,
     timestamp: new Date().toISOString(),
-    conversationLength: conversationHistory.length
+    conversationLength: conversationHistory.length,
+    questionsAndAnswers: qaPairs
   });
+  
+  await saveLearningData(learningData);
+  
+  // Also add to a learning index for quick lookup
+  if (!learningData.learnedCharacters) {
+    learningData.learnedCharacters = [];
+  }
+  
+  // Check if we already have this character
+  const existingIndex = learningData.learnedCharacters.findIndex(
+    char => char.name.toLowerCase() === correctInfo.name.toLowerCase()
+  );
+  
+  if (existingIndex >= 0) {
+    // Update existing character with new Q&A pairs
+    const existing = learningData.learnedCharacters[existingIndex];
+    existing.questionsAndAnswers = [...(existing.questionsAndAnswers || []), ...qaPairs];
+    existing.lastLearned = new Date().toISOString();
+    existing.learnCount = (existing.learnCount || 0) + 1;
+  } else {
+    // Add new character
+    learningData.learnedCharacters.push({
+      name: correctInfo.name,
+      imageUrl: correctInfo.imageUrl,
+      description: correctInfo.description,
+      questionsAndAnswers: qaPairs,
+      firstLearned: new Date().toISOString(),
+      lastLearned: new Date().toISOString(),
+      learnCount: 1
+    });
+  }
+  
   await saveLearningData(learningData);
 }
 
@@ -229,7 +319,7 @@ app.post('/api/game/start', async (req, res) => {
     
     const randomVariant = firstQuestionVariants[Math.floor(Math.random() * firstQuestionVariants.length)];
     
-    const systemPrompt = 'You are playing Akinator. Your response must be ONLY a yes/no question. NO greetings. NO reactions. NO emojis. NO markdown formatting. NO bold text. NO asterisks. NO parenthetical explanations. NO exclamations. BE SPECIFIC - avoid vague terms like "entertainer", "famous person", "celebrity". DO NOT ask about names directly (e.g., "Is your character\'s first name...", "Does your character\'s name start with..."). IMPORTANT: Ask questions that MOST PEOPLE would know the answer to. Avoid overly detailed or obscure questions like specific measurements, exact dates, minor details, or things only experts would know. Ask about well-known characteristics, obvious features, or common knowledge. CRITICAL: You MUST ask about gender in your FIRST question - "Is your character a female?" or "Is your character a male?". This is essential for narrowing down options. CRITICAL: VARY YOUR QUESTIONS COMPLETELY - Never ask about the same topic twice in a row. NEVER ask about occupation (actor, singer, athlete, politician, director, writer, comedian, model, chef, doctor, lawyer, businessman, entrepreneur, or ANY job/profession). Switch between: gender, real/fictional status, relationships, appearance (hair color, eye color, height, distinctive features, bald, beard, glasses), time period, nationality, achievements, hobbies. IMPORTANT: After 5-6 questions, start asking SPECIFIC but COMMONLY KNOWN questions about appearance - "Does your character have blonde hair?", "Is your character bald?", "Does your character have a beard?", "Is your character known for wearing glasses?", "Does your character have tattoos?", "Is your character tall?", "Does your character have blue eyes?". Ask questions that regular people would know, not obscure details. Use ENDLESS VARIETY in appearance questions - never ask similar ones. Ask 15-18 specific questions before guessing to ensure accuracy. Each question should eliminate large groups of possibilities. Ask strategically to narrow down quickly. Questions should be varied and unique. Only if you are really stuck after many questions (15+), you may ask "Does your character\'s name rhyme with [word]?" as a last resort. The person could be ANYONE - real or fictional, famous or obscure, historical or modern, celebrities, characters, adult film actors/actresses, adult content creators, traders, memecoin traders (like Jack Duval), crypto influencers, YouTubers, streamers, social media personalities, or even the player themselves. You can guess the player if clues point to them. After asking enough strategic and specific questions (15-18 questions), make a guess formatted as: "I think you are thinking of: [NAME]". When guessing, be confident with well-known figures - if clues point to someone famous like Donald Trump (president, businessman), Barack Obama (president), Taylor Swift (singer), etc., guess them. CRITICAL: When guessing, ensure the person matches ALL appearance details mentioned in previous answers (e.g., if they said the person is bald, the guess MUST be someone who is bald).';
+    const systemPrompt = 'You are playing Akinator. Your response must be ONLY a yes/no question. NO greetings. NO reactions. NO emojis. NO markdown formatting. NO bold text. NO asterisks. NO parenthetical explanations. NO exclamations. BE SPECIFIC - avoid vague terms like "entertainer", "famous person", "celebrity". DO NOT ask about names directly (e.g., "Is your character\'s first name...", "Does your character\'s name start with..."). IMPORTANT: Ask questions that MOST PEOPLE would know the answer to. Avoid overly detailed or obscure questions like specific measurements, exact dates, minor details, or things only experts would know. Ask about well-known characteristics, obvious features, or common knowledge. CRITICAL: You MUST ask about gender in your FIRST question - "Is your character a female?" or "Is your character a male?". This is essential for narrowing down options. CRITICAL: VARY YOUR QUESTIONS COMPLETELY - Never ask about the same topic twice in a row. NEVER ask about occupation (actor, singer, athlete, politician, director, writer, comedian, model, chef, doctor, lawyer, businessman, entrepreneur, or ANY job/profession). Switch between: gender, real/fictional status, relationships, appearance (hair color, eye color, height, distinctive features, bald, beard, glasses), time period, nationality, achievements, hobbies. IMPORTANT: After 5-6 questions, start asking SPECIFIC but COMMONLY KNOWN questions about appearance - "Does your character have blonde hair?", "Is your character bald?", "Does your character have a beard?", "Is your character known for wearing glasses?", "Does your character have tattoos?", "Is your character tall?", "Does your character have blue eyes?". Ask questions that regular people would know, not obscure details. Use ENDLESS VARIETY in appearance questions - never ask similar ones. Ask 15-18 specific questions before guessing to ensure accuracy. Each question should eliminate large groups of possibilities. Ask strategically to narrow down quickly. Questions should be varied and unique. Only if you are really stuck after many questions (15+), you may ask "Does your character\'s name rhyme with [word]?" as a last resort. The person could be ANYONE - real or fictional, famous or obscure, historical or modern, celebrities, characters, adult film actors/actresses, adult content creators, traders, memecoin traders (like Jack Duval), crypto influencers, YouTubers, streamers, social media personalities, or even the player themselves. You can guess the player if clues point to them. After asking enough strategic and specific questions (15-18 questions), make a guess formatted as: "I think you are thinking of: [NAME]". When guessing, be confident with well-known figures - if clues point to someone famous like Donald Trump (president, businessman), Barack Obama (president), Taylor Swift (singer), etc., guess them. But also remember you can guess less famous people like traders, memecoin traders (like Jack Duval), crypto influencers, YouTubers, streamers, or even the player themselves if clues point to them. CRITICAL: When guessing, ensure the person matches ALL appearance details mentioned in previous answers (e.g., if they said the person is bald, the guess MUST be someone who is bald). CRITICAL: When guessing, ensure the person does NOT match any exclusions from previous "no" answers (e.g., if they said the person does NOT play in a specific league, do NOT guess someone from that league).';
     
     const conversationHistory = [{
       role: 'user',
@@ -253,6 +343,13 @@ app.post('/api/game/start', async (req, res) => {
     gameSessions.set(sessionId, {
       conversationHistory,
       guessCount: 0
+    });
+    
+    // Log conversation for monitoring
+    conversationLogs.set(sessionId, {
+      sessionId,
+      messages: [...conversationHistory],
+      lastUpdate: Date.now()
     });
 
     res.json({
@@ -327,6 +424,8 @@ app.post('/api/game/answer', async (req, res) => {
       role: 'user',
       content: answer
     });
+    
+    updateConversationLog(sessionId, session.conversationHistory);
     }
 
     // Track answer patterns for confidence calculation
@@ -404,6 +503,47 @@ app.post('/api/game/answer', async (req, res) => {
     let genderInstruction = '';
     if (questionCount <= 2 && !hasAskedGender) {
       genderInstruction = ' CRITICAL: You have not asked about gender yet. You MUST ask about gender NOW - "Is your character a female?" or "Is your character a male?". This is essential for narrowing down options.';
+    }
+    
+    // Load learned characters to use their Q&A patterns
+    const learningData = await loadLearningData();
+    let learnedCharacterInstruction = '';
+    if (learningData.learnedCharacters && learningData.learnedCharacters.length > 0) {
+      // Find similar Q&A patterns from learned characters
+      const currentQAPairs = [];
+      for (let i = 0; i < session.conversationHistory.length - 1; i++) {
+        const msg = session.conversationHistory[i];
+        const nextMsg = session.conversationHistory[i + 1];
+        if (msg.role === 'assistant' && nextMsg.role === 'user' && !msg.content.toLowerCase().includes('i think you are thinking of')) {
+          currentQAPairs.push({
+            question: msg.content.toLowerCase(),
+            answer: nextMsg.content.toLowerCase()
+          });
+        }
+      }
+      
+      // Find learned characters with similar answer patterns
+      const similarCharacters = learningData.learnedCharacters.filter(char => {
+        if (!char.questionsAndAnswers || char.questionsAndAnswers.length === 0) return false;
+        // Check if at least 2 Q&A pairs match
+        let matches = 0;
+        for (const learnedQA of char.questionsAndAnswers) {
+          for (const currentQA of currentQAPairs) {
+            if (learnedQA.question.toLowerCase() === currentQA.question.toLowerCase() &&
+                learnedQA.answer === currentQA.answer) {
+              matches++;
+              break;
+            }
+          }
+        }
+        return matches >= 2;
+      });
+      
+      if (similarCharacters.length > 0) {
+        // Use the most frequently learned character
+        const bestMatch = similarCharacters.sort((a, b) => (b.learnCount || 1) - (a.learnCount || 1))[0];
+        learnedCharacterInstruction = ` LEARNING: Based on similar previous conversations, you might be thinking of someone like "${bestMatch.name}" (${bestMatch.description || 'character'}). Consider asking questions that would help distinguish or confirm this.`;
+      }
     }
     
     // Build comprehensive learning from ALL previous questions and answers
@@ -593,7 +733,7 @@ app.post('/api/game/answer', async (req, res) => {
       }
     }
     
-    let systemPrompt = 'ONLY a yes/no question. NO greetings, reactions, emojis, markdown, bold, asterisks, explanations. BE SPECIFIC - avoid vague terms like "entertainer", "famous person", "celebrity". DO NOT ask about names directly (e.g., "Is your character\'s first name...", "Does your character\'s name start with..."). IMPORTANT: Ask questions that MOST PEOPLE would know the answer to. Avoid overly detailed or obscure questions like specific measurements, exact dates, minor details, or things only experts would know. Ask about well-known characteristics, obvious features, or common knowledge. ' + genderInstruction + dontKnowInstruction + learningInstruction + varietyInstruction + adaptiveInstruction + ' CRITICAL: VARY YOUR QUESTIONS COMPLETELY - Never ask about the same topic twice in a row. NEVER cycle through occupations (actor, singer, athlete, politician). Switch between: gender, real/fictional status, relationships, appearance (hair color, eye color, height, distinctive features), time period, nationality, achievements, hobbies, media presence, distinctive characteristics. IMPORTANT: After 5-6 questions, start asking SPECIFIC but COMMONLY KNOWN questions about appearance - "Does your character have blonde hair?", "Is your character bald?", "Does your character have a beard?", "Is your character known for wearing glasses?", "Does your character have tattoos?", "Is your character tall?", "Does your character have blue eyes?". Ask questions that regular people would know, not obscure details. Use ENDLESS VARIETY in appearance questions - never ask similar ones. Ask 15-25 specific questions before guessing to ensure accuracy. Each question should eliminate large groups of possibilities. Ask strategically to narrow down quickly. Person could be ANYONE - famous celebrities, traders, memecoin traders (like Jack Duval), crypto influencers, YouTubers, streamers, social media personalities, or even the player themselves. You can guess the player if clues point to them. Only if you are really stuck after many questions (25+), you may ask "Does your character\'s name rhyme with [word]?" as a last resort. After 15-25 questions, guess: "I think you are thinking of: [NAME]"';
+    let systemPrompt = 'ONLY a yes/no question. NO greetings, reactions, emojis, markdown, bold, asterisks, explanations. BE SPECIFIC - avoid vague terms like "entertainer", "famous person", "celebrity". DO NOT ask about names directly (e.g., "Is your character\'s first name...", "Does your character\'s name start with..."). IMPORTANT: Ask questions that MOST PEOPLE would know the answer to. Avoid overly detailed or obscure questions like specific measurements, exact dates, minor details, or things only experts would know. Ask about well-known characteristics, obvious features, or common knowledge. ' + genderInstruction + dontKnowInstruction + learnedCharacterInstruction + learningInstruction + varietyInstruction + adaptiveInstruction + ' CRITICAL: VARY YOUR QUESTIONS COMPLETELY - Never ask about the same topic twice in a row. NEVER cycle through occupations (actor, singer, athlete, politician). Switch between: gender, real/fictional status, relationships, appearance (hair color, eye color, height, distinctive features), time period, nationality, achievements, hobbies, media presence, distinctive characteristics. IMPORTANT: After 5-6 questions, start asking SPECIFIC but COMMONLY KNOWN questions about appearance - "Does your character have blonde hair?", "Is your character bald?", "Does your character have a beard?", "Is your character known for wearing glasses?", "Does your character have tattoos?", "Is your character tall?", "Does your character have blue eyes?". Ask questions that regular people would know, not obscure details. Use ENDLESS VARIETY in appearance questions - never ask similar ones. Ask 15-25 specific questions before guessing to ensure accuracy. Each question should eliminate large groups of possibilities. Ask strategically to narrow down quickly. Person could be ANYONE - famous celebrities, traders, memecoin traders (like Jack Duval), crypto influencers, YouTubers, streamers, social media personalities, or even the player themselves. You can guess the player if clues point to them. Only if you are really stuck after many questions (25+), you may ask "Does your character\'s name rhyme with [word]?" as a last resort. After 15-25 questions, guess: "I think you are thinking of: [NAME]"';
     
     if (shouldEncourageGuess) {
       // Include appearance details and exclusions in guess prompt
@@ -703,6 +843,8 @@ app.post('/api/game/answer', async (req, res) => {
       role: 'assistant',
       content: response
     });
+    
+    updateConversationLog(sessionId, session.conversationHistory);
 
     // Calculate progress based on questions and confidence
     // Progress increases faster with more "yes" answers
@@ -792,6 +934,8 @@ app.post('/api/game/guess-result', async (req, res) => {
         role: 'user',
         content: 'Yes, that\'s correct!'
       });
+      
+      updateConversationLog(sessionId, session.conversationHistory);
     } else {
       // Save wrong guess to learning data
       const lastGuess = session.conversationHistory
@@ -808,6 +952,10 @@ app.post('/api/game/guess-result', async (req, res) => {
         role: 'user',
         content: `No, that's not correct. ${actualAnswer ? `The correct answer is: ${actualAnswer}` : 'Please ask more questions.'}`
       });
+      
+      updateConversationLog(sessionId, session.conversationHistory);
+      
+      updateConversationLog(sessionId, session.conversationHistory);
 
       // Continue asking questions - use limited history and fewer tokens
       const recentHistory = session.conversationHistory.slice(-10);
@@ -919,7 +1067,7 @@ app.post('/api/game/guess-result', async (req, res) => {
         }
       }
       
-      const baseSystemPrompt = 'ONLY a yes/no question. NO greetings, reactions, emojis, markdown, bold, asterisks. BE SPECIFIC - avoid vague terms like "entertainer", "famous person", "celebrity". DO NOT ask about names directly (e.g., "Is your character\'s first name...", "Does your character\'s name start with..."). IMPORTANT: Ask questions that MOST PEOPLE would know the answer to. Avoid overly detailed or obscure questions like specific measurements, exact dates, minor details, or things only experts would know. Ask about well-known characteristics, obvious features, or common knowledge. CRITICAL: VARY YOUR QUESTIONS COMPLETELY - Never ask about the same topic twice in a row. NEVER cycle through occupations (actor, singer, athlete, politician). Switch between: gender, real/fictional status, relationships, appearance (hair color, eye color, height, distinctive features), time period, nationality, achievements, hobbies, media presence, distinctive characteristics. IMPORTANT: Ask SPECIFIC but COMMONLY KNOWN questions about appearance - "Does your character have blonde hair?", "Is your character bald?", "Does your character have a beard?", "Is your character known for wearing glasses?", "Does your character have tattoos?", "Is your character tall?", "Does your character have blue eyes?". Ask questions that regular people would know, not obscure details. Use ENDLESS VARIETY in appearance questions - never ask similar ones. Ask 15-25 specific questions before guessing to ensure accuracy. Each question should eliminate large groups of possibilities. Ask strategically to narrow down quickly. Person could be ANYONE - famous celebrities, traders, memecoin traders (like Jack Duval), crypto influencers, YouTubers, streamers, social media personalities, or even the player themselves. You can guess the player if clues point to them. Only if you are really stuck after many questions (25+), you may ask "Does your character\'s name rhyme with [word]?" as a last resort. After 15-25 questions, guess: "I think you are thinking of: [NAME]"';
+      const baseSystemPrompt = 'ONLY a yes/no question. NO greetings, reactions, emojis, markdown, bold, asterisks. BE SPECIFIC - avoid vague terms like "entertainer", "famous person", "celebrity". DO NOT ask about names directly (e.g., "Is your character\'s first name...", "Does your character\'s name start with..."). IMPORTANT: Ask questions that MOST PEOPLE would know the answer to. Avoid overly detailed or obscure questions like specific measurements, exact dates, minor details, or things only experts would know. Ask about well-known characteristics, obvious features, or common knowledge. CRITICAL: VARY YOUR QUESTIONS COMPLETELY - Never ask about the same topic twice in a row. NEVER cycle through occupations (actor, singer, athlete, politician). Switch between: gender, real/fictional status, relationships, appearance (hair color, eye color, height, distinctive features), time period, nationality, achievements, hobbies, media presence, distinctive characteristics. IMPORTANT: Ask SPECIFIC but COMMONLY KNOWN questions about appearance - "Does your character have blonde hair?", "Is your character bald?", "Does your character have a beard?", "Is your character known for wearing glasses?", "Does your character have tattoos?", "Is your character tall?", "Does your character have blue eyes?". Ask questions that regular people would know, not obscure details. Use ENDLESS VARIETY in appearance questions - never ask similar ones. Ask 15-18 specific questions before guessing to ensure accuracy. Each question should eliminate large groups of possibilities. Ask strategically to narrow down quickly. Person could be ANYONE - famous celebrities, traders, memecoin traders (like Jack Duval), crypto influencers, YouTubers, streamers, social media personalities, or even the player themselves. You can guess the player if clues point to them. Only if you are really stuck after many questions (20+), you may ask "Does your character\'s name rhyme with [word]?" as a last resort. After 15-18 questions, guess: "I think you are thinking of: [NAME]"';
       
       const message = await anthropic.messages.create({
         model: 'claude-opus-4-5-20251101',
@@ -993,6 +1141,8 @@ app.post('/api/game/guess-result', async (req, res) => {
         role: 'assistant',
         content: nextQuestion
       });
+      
+      updateConversationLog(sessionId, session.conversationHistory);
 
       return res.json({
         question: nextQuestion,

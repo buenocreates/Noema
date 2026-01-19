@@ -477,6 +477,7 @@ async function submitAnswer(answer) {
 
     try {
         answerButtons.forEach(btn => btn.disabled = true);
+        if (backQuestionBtn) backQuestionBtn.disabled = true;
 
         const response = await fetch(`${API_BASE}/game/answer`, {
             method: 'POST',
@@ -523,6 +524,7 @@ async function submitAnswer(answer) {
                     }
                     
                     answerButtons.forEach(btn => btn.disabled = false);
+                    if (backQuestionBtn) backQuestionBtn.disabled = false;
                     return;
                 }
             }
@@ -608,10 +610,12 @@ async function submitAnswer(answer) {
         }
 
         answerButtons.forEach(btn => btn.disabled = false);
+        if (backQuestionBtn) backQuestionBtn.disabled = false;
     } catch (error) {
         console.error('Error submitting answer:', error);
         alert('Failed to submit answer. Please try again.');
         answerButtons.forEach(btn => btn.disabled = false);
+        if (backQuestionBtn) backQuestionBtn.disabled = false;
     }
 }
 
@@ -918,6 +922,8 @@ if (backQuestionBtn) {
         // Update server with new history and get previous question
         try {
             answerButtons.forEach(btn => btn.disabled = true);
+            if (backQuestionBtn) backQuestionBtn.disabled = true;
+        if (backQuestionBtn) backQuestionBtn.disabled = true;
             
             const response = await fetch(`${API_BASE}/game/answer`, {
                 method: 'POST',
@@ -963,10 +969,12 @@ if (backQuestionBtn) {
             }
             
             answerButtons.forEach(btn => btn.disabled = false);
+            if (backQuestionBtn) backQuestionBtn.disabled = false;
         } catch (error) {
             console.error('Error going back:', error);
             alert('Failed to go back: ' + error.message);
             answerButtons.forEach(btn => btn.disabled = false);
+            if (backQuestionBtn) backQuestionBtn.disabled = false;
         }
     });
 }
