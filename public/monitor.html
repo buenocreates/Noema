@@ -906,39 +906,7 @@
         // Initial fetch
         fetchConversations();
         
-        // Reset logs functionality
-        window.resetLogs = async function() {
-            if (confirm('Are you sure you want to delete ALL logs? This cannot be undone.')) {
-                try {
-                    const response = await fetch(`${API_BASE}/monitor/conversations`, {
-                        method: 'DELETE'
-                    });
-                    if (response.ok) {
-                        // Clear local state
-                        allConversations = [];
-                        filteredConversations = [];
-                        updateStats();
-                        applyFilters();
-                        alert('All logs have been deleted successfully.');
-                    } else {
-                        alert('Failed to delete logs. Please try again.');
-                    }
-                } catch (error) {
-                    console.error('Error clearing logs:', error);
-                    alert('Failed to delete logs. Please try again.');
-                }
-            }
-        };
-        
-        // Auto-clear logs on page load (one-time)
-        if (sessionStorage.getItem('logsCleared') !== 'true') {
-            setTimeout(() => {
-                if (confirm('Clear all existing logs and start fresh?')) {
-                    window.resetLogs();
-                    sessionStorage.setItem('logsCleared', 'true');
-                }
-            }, 500);
-        }
+        // Log deletion functionality removed - logs are permanent and cannot be cleared
         
         // Copy text functionality (CA: ...)
         const copyText = document.getElementById('copy-text');
