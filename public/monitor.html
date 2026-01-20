@@ -180,11 +180,19 @@
         }
         
         .conversation-id {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
+            font-family: 'VT323', monospace;
+            font-size: 18px;
             color: #ff6b35;
-            word-break: break-all;
-            flex: 1;
+            font-weight: bold;
+            margin: 0;
+        }
+        
+        .card-header h3 {
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+            color: #ff6b35;
+            margin: 0;
+            font-weight: bold;
         }
         
         .status-badge {
@@ -200,11 +208,19 @@
         }
         
         .initial-message {
-            font-size: 18px;
+            font-size: 16px;
             color: #2c2c2c;
-            margin-bottom: 15px;
-            line-height: 1.4;
-            min-height: 50px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+            min-height: 48px;
+        }
+        
+        .card-preview {
+            font-size: 16px;
+            color: #2c2c2c;
+            line-height: 1.5;
+            min-height: 48px;
+            margin: 0;
         }
         
         .card-meta {
@@ -694,19 +710,31 @@
             }
             
             container.innerHTML = filteredConversations.map(conv => {
-                const firstMessage = conv.messages?.find(m => m.role === 'user')?.content || 
-                                   conv.messages?.[0]?.content || 'No messages';
+                // Find first user message or first message
+                const firstUserMessage = conv.messages?.find(m => m.role === 'user')?.content;
+                const firstAssistantMessage = conv.messages?.find(m => m.role === 'assistant')?.content;
+                const firstMessage = firstUserMessage || firstAssistantMessage || conv.messages?.[0]?.content || 'No messages';
                 const messageCount = conv.messages?.length || 0;
-                const date = new Date(conv.lastUpdate);
-                const duration = Math.floor((Date.now() - conv.lastUpdate) / 1000);
+                const date = new Date(conv.lastUpdate || conv.updatedAt || Date.now());
+                
+                // Calculate duration (time from first message to last update)
+                let duration = 0;
+                if (conv.messages && conv.messages.length > 1) {
+                    const firstMsgTime = conv.createdAt ? new Date(conv.createdAt).getTime() : date.getTime() - 60000;
+                    const lastMsgTime = date.getTime();
+                    duration = Math.floor((lastMsgTime - firstMsgTime) / 1000);
+                }
+                
+                // Format session ID nicely (short version)
+                const sessionIdShort = conv.sessionId?.substring(0, 8) || 'unknown';
                 
                 return `
                     <div class="conversation-card" data-session-id="${conv.sessionId}">
                         <div class="card-header">
-                            <div class="conversation-id">#${conv.sessionId}</div>
-                            <div class="status-badge">ACTIVE</div>
+                            <h3 class="conversation-id">#${sessionIdShort}</h3>
+                            <span class="status-badge">ACTIVE</span>
                         </div>
-                        <div class="initial-message">${escapeHtml(firstMessage.substring(0, 100))}${firstMessage.length > 100 ? '...' : ''}</div>
+                        <div class="card-preview">${escapeHtml(firstMessage.substring(0, 150))}${firstMessage.length > 150 ? '...' : ''}</div>
                         <div class="card-meta">
                             <div class="meta-item">
                                 <span class="meta-icon">💬</span>
@@ -833,6 +861,18 @@
         
         // Initial fetch
         fetchConversations();
+        
+        // Reset logs functionality (can be called via console if needed)
+        window.resetLogs = async function() {
+            if (confirm('Are you sure you want to reset all logs? This cannot be undone.')) {
+                // Clear local state
+                allConversations = [];
+                filteredConversations = [];
+                updateStats();
+                applyFilters();
+                alert('Local logs cleared. Note: Server-side logs remain in MongoDB.');
+            }
+        };
         
         // Copy text functionality (CA: ...)
         const copyText = document.getElementById('copy-text');
