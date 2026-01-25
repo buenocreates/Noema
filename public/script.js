@@ -354,11 +354,15 @@ async function startGame() {
         headers: {
             'Content-Type': 'application/json'
         }
-    }).then(response => {
+    }).then(async response => {
         if (response.ok) {
             return response.json();
         }
-        throw new Error('Failed to start game');
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 503 && errorData.error?.includes('overloaded')) {
+            throw new Error('Claude API is currently overloaded. Please wait a moment and try again.');
+        }
+        throw new Error(errorData.details || errorData.error || 'Failed to start game');
     }).then(data => {
         // Store session data before redirect completes
         sessionStorage.setItem('gameSession', JSON.stringify({
@@ -394,7 +398,11 @@ async function submitAnswer(answer) {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to submit answer');
+            const errorData = await response.json().catch(() => ({}));
+            if (response.status === 503 && errorData.error?.includes('overloaded')) {
+                throw new Error('Claude API is currently overloaded. Please wait a moment and try again.');
+            }
+            throw new Error(errorData.details || errorData.error || 'Failed to submit answer');
         }
 
         const data = await response.json();
@@ -465,7 +473,8 @@ async function submitAnswer(answer) {
         answerButtons.forEach(btn => btn.disabled = false);
     } catch (error) {
         console.error('Error submitting answer:', error);
-        alert('Failed to submit answer. Please try again.');
+        const errorMessage = error.message || 'Failed to submit answer. Please try again.';
+        alert(errorMessage);
         loading.style.display = 'none';
         answerButtons.forEach(btn => btn.disabled = false);
     }

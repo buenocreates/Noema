@@ -36,6 +36,27 @@ if (!process.env.ANTHROPIC_API_KEY) {
   process.exit(1);
 }
 
+// Retry function with exponential backoff for API calls
+async function retryApiCall(apiCall, maxRetries = 3, baseDelay = 1000) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await apiCall();
+    } catch (error) {
+      const isOverloaded = error.error?.type === 'overloaded_error' || 
+                          error.status === 529 ||
+                          error.message?.includes('Overloaded');
+      
+      if (isOverloaded && attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`API overloaded, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 // Store game sessions
 const gameSessions = new Map();
 
@@ -389,12 +410,14 @@ app.post('/api/game/start', async (req, res) => {
       content: randomVariant
     }];
 
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 50,
-      temperature: 0.7,
-      system: systemPrompt,
-      messages: conversationHistory
+    const message = await retryApiCall(async () => {
+      return await anthropic.messages.create({
+        model: 'claude-opus-4-5-20251101',
+        max_tokens: 100,
+        temperature: 0.7,
+        system: systemPrompt,
+        messages: conversationHistory
+      });
     });
 
     const firstQuestion = cleanResponse(message.content[0].text);
@@ -416,11 +439,23 @@ app.post('/api/game/start', async (req, res) => {
       question: firstQuestion
     });
   } catch (error) {
-    console.error('Error starting game:', error.message);
-    res.status(500).json({ 
-      error: 'Failed to start game',
-      details: error.message 
-    });
+    console.error('Error starting game:', error);
+    const isOverloaded = error.error?.type === 'overloaded_error' || 
+                        error.status === 529 ||
+                        error.message?.includes('Overloaded');
+    
+    if (isOverloaded) {
+      res.status(503).json({ 
+        error: 'Claude API is currently overloaded. Please try again in a few moments.',
+        details: 'The AI service is experiencing high traffic. Please wait a moment and try again.',
+        retryAfter: 30
+      });
+    } else {
+      res.status(500).json({ 
+        error: 'Failed to start game',
+        details: error.message || 'Unknown error'
+      });
+    }
   }
 });
 
@@ -829,12 +864,14 @@ app.post('/api/game/answer', async (req, res) => {
     
     // Use fewer tokens and limit conversation history for faster responses
     const recentHistory = session.conversationHistory.slice(-10); // Only keep last 10 messages
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 40,
-      temperature: 0.7,
-      system: systemPrompt + noRepeatInstruction,
-      messages: recentHistory
+    const message = await retryApiCall(async () => {
+      return await anthropic.messages.create({
+        model: 'claude-opus-4-5-20251101',
+        max_tokens: 100,
+        temperature: 0.7,
+        system: systemPrompt + noRepeatInstruction,
+        messages: recentHistory
+      });
     });
 
     let response = cleanResponse(message.content[0].text);
@@ -864,12 +901,14 @@ app.post('/api/game/answer', async (req, res) => {
       let retryCount = 0;
       while (isDuplicate && retryCount < 3) {
         const retryPrompt = systemPrompt + noRepeatInstruction + `\n\nERROR: You just repeated or asked a very similar question. Ask a COMPLETELY DIFFERENT question with different words. Previous questions: ${allPreviousQuestions.slice(-5).join(' | ')}`;
-        const retryMessage = await anthropic.messages.create({
-          model: 'claude-opus-4-5-20251101',
-          max_tokens: 40,
-          temperature: 0.8, // Increase temperature for more variety
-          system: retryPrompt,
-          messages: recentHistory
+        const retryMessage = await retryApiCall(async () => {
+          return await anthropic.messages.create({
+            model: 'claude-opus-4-5-20251101',
+            max_tokens: 100,
+            temperature: 0.8, // Increase temperature for more variety
+            system: retryPrompt,
+            messages: recentHistory
+          });
         });
         response = cleanResponse(retryMessage.content[0].text);
         const newResponseLower = response.toLowerCase().trim();
@@ -956,11 +995,27 @@ app.post('/api/game/answer', async (req, res) => {
       guessDescription: guessDescription || undefined
     });
   } catch (error) {
-    console.error('Error processing answer:', error.message);
-    res.status(500).json({ 
-      error: 'Failed to process answer',
-      details: error.message 
-    });
+    console.error('Error processing answer:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    
+    const isOverloaded = error.error?.type === 'overloaded_error' || 
+                        error.status === 529 ||
+                        error.message?.includes('Overloaded');
+    
+    if (isOverloaded) {
+      res.status(503).json({ 
+        error: 'Claude API is currently overloaded. Please try again in a few moments.',
+        details: 'The AI service is experiencing high traffic. Please wait a moment and try again.',
+        retryAfter: 30
+      });
+    } else {
+      res.status(500).json({ 
+        error: 'Failed to process answer',
+        details: error.message || 'Unknown error',
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
   }
 });
 
@@ -1126,12 +1181,14 @@ app.post('/api/game/guess-result', async (req, res) => {
       
       const baseSystemPrompt = 'ONLY a yes/no question. NO greetings, reactions, emojis, markdown, bold, asterisks. BE SPECIFIC - avoid vague terms like "entertainer", "famous person", "celebrity". DO NOT ask about names directly (e.g., "Is your character\'s first name...", "Does your character\'s name start with..."). IMPORTANT: Ask questions that MOST PEOPLE would know the answer to. Avoid overly detailed or obscure questions like specific measurements, exact dates, minor details, or things only experts would know. Ask about well-known characteristics, obvious features, or common knowledge. CRITICAL: VARY YOUR QUESTIONS COMPLETELY - Never ask about the same topic twice in a row. NEVER cycle through occupations (actor, singer, athlete, politician). Switch between: gender, real/fictional status, relationships, appearance (hair color, eye color, height, distinctive features), time period, nationality, achievements, hobbies, media presence, distinctive characteristics. IMPORTANT: Ask SPECIFIC but COMMONLY KNOWN questions about appearance - "Does your character have blonde hair?", "Is your character bald?", "Does your character have a beard?", "Is your character known for wearing glasses?", "Does your character have tattoos?", "Is your character tall?", "Does your character have blue eyes?". Ask questions that regular people would know, not obscure details. Use ENDLESS VARIETY in appearance questions - never ask similar ones. Ask 15-18 specific questions before guessing to ensure accuracy. Each question should eliminate large groups of possibilities. Ask strategically to narrow down quickly. Person could be ANYONE - famous celebrities, traders, memecoin traders (like Jack Duval), crypto influencers, YouTubers, streamers, social media personalities, or even the player themselves. You can guess the player if clues point to them. Only if you are really stuck after many questions (20+), you may ask "Does your character\'s name rhyme with [word]?" as a last resort. After 15-18 questions, guess: "I think you are thinking of: [NAME]"';
       
-      const message = await anthropic.messages.create({
-        model: 'claude-opus-4-5-20251101',
-        max_tokens: 40,
-        temperature: 0.7,
-        system: baseSystemPrompt + dontKnowInstruction + learningInstructionWrong + noRepeatInstruction,
-        messages: recentHistory
+      const message = await retryApiCall(async () => {
+        return await anthropic.messages.create({
+          model: 'claude-opus-4-5-20251101',
+          max_tokens: 100,
+          temperature: 0.7,
+          system: baseSystemPrompt + dontKnowInstruction + learningInstructionWrong + noRepeatInstruction,
+          messages: recentHistory
+        });
       });
 
       let nextQuestion = cleanResponse(message.content[0].text);
@@ -1163,7 +1220,7 @@ app.post('/api/game/guess-result', async (req, res) => {
           const retryPrompt = baseSystemPrompt + noRepeatInstruction + `\n\nERROR: You just repeated or asked a very similar question. Ask a COMPLETELY DIFFERENT question with different words. Previous questions: ${allPreviousQuestions.slice(-5).join(' | ')}`;
           const retryMessage = await anthropic.messages.create({
             model: 'claude-opus-4-5-20251101',
-            max_tokens: 40,
+            max_tokens: 100,
             temperature: 0.8, // Increase temperature for more variety
             system: retryPrompt,
             messages: recentHistory
@@ -1251,14 +1308,36 @@ app.get('/api/monitor/conversations', async (req, res) => {
 async function startServer() {
   await initMongoDB();
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-    if (interactionsCollection) {
-      console.log('Interactions are being saved to MongoDB Atlas');
-    } else {
-      console.log('Warning: MongoDB not connected. Interactions will only be stored in memory.');
+  // Listen on 0.0.0.0 for production (Render, Heroku, etc.)
+  // This allows the server to accept connections from any network interface
+  const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
+  
+  app.listen(PORT, HOST, () => {
+    console.log(`✅ Server running on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+    if (process.env.NODE_ENV === 'production') {
+      console.log(`🌐 Server is accessible from external networks on port ${PORT}`);
     }
-});
+    if (interactionsCollection) {
+      console.log('✅ Interactions are being saved to MongoDB Atlas');
+    } else {
+      console.log('⚠️  Warning: MongoDB not connected. Interactions will only be stored in memory.');
+    }
+  }).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use.`);
+      console.error('Please stop the other process or use a different PORT in your .env file.');
+      process.exit(1);
+    } else if (err.code === 'EPERM') {
+      console.error('❌ Permission denied to bind to port. This may be a system security restriction.');
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Try using a different PORT in your .env file (e.g., PORT=5000)');
+      }
+      process.exit(1);
+    } else {
+      console.error('❌ Error starting server:', err.message);
+      process.exit(1);
+    }
+  });
 }
 
 startServer();
